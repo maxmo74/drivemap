@@ -4,27 +4,20 @@ const searchButton = document.getElementById('search-button');
 const searchResults = document.getElementById('search-results');
 const listResults = document.getElementById('list-results');
 const refreshButton = document.getElementById('refresh-button');
-const tabWatchlist = document.getElementById('tab-watchlist');
-const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
-
-let activeTab = 'unwatched';
-let searchTimer;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
 };
 
-const buildCard = (item, mode) => {
+const buildCard = (item, actionLabel, actionHandler) => {
   const card = cardTemplate.content.cloneNode(true);
   const article = card.querySelector('.card');
   const image = card.querySelector('.card-image');
   const title = card.querySelector('.card-title');
   const meta = card.querySelector('.card-meta');
   const rating = card.querySelector('.card-rating');
-  const addButton = card.querySelector('.card-action.primary');
-  const watchedButton = card.querySelector('.card-action.secondary');
-  const removeButton = card.querySelector('.card-action.danger');
+  const action = card.querySelector('.card-action');
 
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
   image.alt = `${item.title} poster`;
@@ -38,20 +31,8 @@ const buildCard = (item, mode) => {
   }
   meta.textContent = parts.join(' • ') || 'Unknown';
   rating.textContent = item.rating ? `IMDB ${item.rating}` : 'IMDB rating unavailable';
-
-  if (mode === 'search') {
-    addButton.textContent = 'Add';
-    watchedButton.textContent = 'Add as watched';
-    removeButton.remove();
-    addButton.addEventListener('click', () => addToList(item, false, article));
-    watchedButton.addEventListener('click', () => addToList(item, true, article));
-  } else {
-    addButton.textContent = item.watched ? 'Move to watchlist' : 'Mark watched';
-    watchedButton.remove();
-    removeButton.textContent = 'Remove';
-    addButton.addEventListener('click', () => toggleWatched(item));
-    removeButton.addEventListener('click', () => removeFromList(item));
-  }
+  action.textContent = actionLabel;
+  action.addEventListener('click', () => actionHandler(item, article));
 
   return card;
 };
@@ -63,7 +44,7 @@ const renderSearchResults = (items) => {
     return;
   }
   items.forEach((item) => {
-    const card = buildCard(item, 'search');
+    const card = buildCard(item, 'Add', addToList);
     searchResults.appendChild(card);
   });
 };
@@ -71,21 +52,19 @@ const renderSearchResults = (items) => {
 const renderList = (items) => {
   listResults.innerHTML = '';
   if (!items.length) {
-    showStatus(listResults, activeTab === 'watched'
-      ? 'No watched items yet.'
-      : 'Your list is empty. Add something from the search results.');
+    showStatus(listResults, 'Your list is empty. Add something from the search results.');
     return;
   }
   items.forEach((item) => {
-    const card = buildCard(item, 'list');
+    const card = buildCard(item, 'Remove', removeFromList);
     listResults.appendChild(card);
   });
 };
 
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
-  if (query.length < 2) {
-    showStatus(searchResults, 'Type at least 2 characters to search.');
+  if (!query) {
+    showStatus(searchResults, 'Type a title to search.');
     return;
   }
   showStatus(searchResults, 'Searching...');
@@ -98,14 +77,9 @@ const fetchSearch = async () => {
   renderSearchResults(data.results || []);
 };
 
-const debounceSearch = () => {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(fetchSearch, 350);
-};
-
 const loadList = async () => {
   showStatus(listResults, 'Loading list...');
-  const response = await fetch(`/api/list?room=${encodeURIComponent(room)}&status=${activeTab}`);
+  const response = await fetch(`/api/list?room=${encodeURIComponent(room)}`);
   if (!response.ok) {
     showStatus(listResults, 'Unable to load list.');
     return;
@@ -114,32 +88,17 @@ const loadList = async () => {
   renderList(data.items || []);
 };
 
-const addToList = async (item, watched, cardNode) => {
+const addToList = async (item, cardNode) => {
   const response = await fetch('/api/list', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...item, room, watched })
+    body: JSON.stringify({ ...item, room })
   });
   if (!response.ok) {
     alert('Failed to add item.');
     return;
   }
-  if (cardNode) {
-    cardNode.querySelector('.card-action.primary').textContent = 'Added';
-  }
-  await loadList();
-};
-
-const toggleWatched = async (item) => {
-  const response = await fetch('/api/list', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title_id: item.title_id, room, watched: item.watched ? 0 : 1 })
-  });
-  if (!response.ok) {
-    alert('Failed to update item.');
-    return;
-  }
+  cardNode.querySelector('.card-action').textContent = 'Added';
   await loadList();
 };
 
@@ -156,24 +115,13 @@ const removeFromList = async (item) => {
   await loadList();
 };
 
-const setActiveTab = (nextTab) => {
-  activeTab = nextTab;
-  tabWatchlist.classList.toggle('active', activeTab === 'unwatched');
-  tabWatched.classList.toggle('active', activeTab === 'watched');
-  loadList();
-};
-
 searchButton.addEventListener('click', fetchSearch);
-searchInput.addEventListener('input', debounceSearch);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     fetchSearch();
   }
 });
 refreshButton.addEventListener('click', loadList);
-
-tabWatchlist.addEventListener('click', () => setActiveTab('unwatched'));
-tabWatched.addEventListener('click', () => setActiveTab('watched'));
 
 loadList();
 renderSearchResults([]);

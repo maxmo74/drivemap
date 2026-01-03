@@ -17,10 +17,6 @@
           <span>Room</span>
           <strong id="room-id">{{ room }}</strong>
         </div>
-        <div class="version-badge">
-          <span>Version</span>
-          <strong id="app-version">{{ app_version }}</strong>
-        </div>
       </header>
 
       <section class="search-panel">
@@ -34,10 +30,7 @@
 
       <section class="list-panel">
         <div class="list-header">
-          <div class="tabs" role="tablist">
-            <button id="tab-watchlist" class="tab active" role="tab">Watchlist</button>
-            <button id="tab-watched" class="tab" role="tab">Watched</button>
-          </div>
+          <h2>Your list</h2>
           <button id="refresh-button" class="ghost">Refresh</button>
         </div>
         <div id="list-results" class="list-grid"></div>
@@ -48,16 +41,10 @@
       <article class="card">
         <img class="card-image" alt="" />
         <div class="card-body">
-          <div class="card-row">
-            <h3 class="card-title"></h3>
-            <p class="card-rating"></p>
-          </div>
+          <h3 class="card-title"></h3>
           <p class="card-meta"></p>
-          <div class="card-actions">
-            <button class="card-action primary">Add</button>
-            <button class="card-action secondary">Watched</button>
-            <button class="card-action danger">Remove</button>
-          </div>
+          <p class="card-rating"></p>
+          <button class="card-action">Add</button>
         </div>
       </article>
     </template>

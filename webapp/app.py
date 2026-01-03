@@ -18,7 +18,6 @@ CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 USER_AGENT = "drivemap-movielist/1.0 (+https://example.com)"
-APP_VERSION = "0.2.0"
 
 app = Flask(__name__)
 
@@ -33,42 +32,36 @@ class SearchResult:
     rating: str | None
 
 
+
 def _get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def _migrate_db(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS lists (
-            room TEXT NOT NULL,
-            title_id TEXT NOT NULL,
-            title TEXT NOT NULL,
-            year TEXT,
-            type_label TEXT,
-            image TEXT,
-            rating TEXT,
-            added_at INTEGER NOT NULL,
-            PRIMARY KEY (room, title_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS rating_cache (
-            title_id TEXT PRIMARY KEY,
-            rating TEXT,
-            cached_at INTEGER NOT NULL
-        );
-        """
-    )
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(lists)")}
-    if "watched" not in columns:
-        conn.execute("ALTER TABLE lists ADD COLUMN watched INTEGER NOT NULL DEFAULT 0")
-
-
 def init_db() -> None:
     with _get_db() as conn:
-        _migrate_db(conn)
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS lists (
+                room TEXT NOT NULL,
+                title_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                year TEXT,
+                type_label TEXT,
+                image TEXT,
+                rating TEXT,
+                added_at INTEGER NOT NULL,
+                PRIMARY KEY (room, title_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS rating_cache (
+                title_id TEXT PRIMARY KEY,
+                rating TEXT,
+                cached_at INTEGER NOT NULL
+            );
+            """
+        )
 
 
 def _rating_cache_get(conn: sqlite3.Connection, title_id: str) -> str | None:
@@ -181,16 +174,6 @@ def _default_room() -> str:
     return hashlib.sha256(entropy).hexdigest()[:10]
 
 
-def _parse_watched(value: Any) -> int:
-    if isinstance(value, bool):
-        return 1 if value else 0
-    if isinstance(value, (int, float)):
-        return 1 if value else 0
-    if isinstance(value, str):
-        return 1 if value.lower() in {"1", "true", "yes", "watched"} else 0
-    return 0
-
-
 @app.route("/")
 def root() -> Any:
     return redirect("/r/new")
@@ -200,7 +183,7 @@ def root() -> Any:
 def room(room: str) -> Any:
     if room == "new":
         return redirect(f"/r/{_default_room()}")
-    return render_template("index.html", room=room, app_version=APP_VERSION)
+    return render_template("index.html", room=room)
 
 
 @app.route("/api/search")
@@ -210,7 +193,7 @@ def api_search() -> Any:
         results = fetch_suggestions(query)
     except requests.RequestException as exc:
         return jsonify({"error": "imdb_fetch_failed", "detail": str(exc)}), 502
-    return jsonify({"results": [serialize_result(result) for result in results[:8]]})
+    return jsonify({"results": [serialize_result(result) for result in results[:12]]})
 
 
 @app.route("/api/list", methods=["GET"])
@@ -218,13 +201,10 @@ def api_list() -> Any:
     room = _room_from_request() or request.args.get("room", "")
     if not room:
         return jsonify({"error": "missing_room"}), 400
-    status = request.args.get("status", "unwatched")
-    watched_flag = 1 if status == "watched" else 0
     with _get_db() as conn:
-        _migrate_db(conn)
         rows = conn.execute(
-            "SELECT * FROM lists WHERE room = ? AND watched = ? ORDER BY added_at DESC",
-            (room, watched_flag),
+            "SELECT * FROM lists WHERE room = ? ORDER BY added_at DESC",
+            (room,),
         ).fetchall()
     return jsonify({"items": [dict(row) for row in rows]})
 
@@ -241,11 +221,9 @@ def api_add() -> Any:
     title = data.get("title")
     if not title_id or not title:
         return jsonify({"error": "missing_title"}), 400
-    watched = _parse_watched(data.get("watched", 0))
     with _get_db() as conn:
-        _migrate_db(conn)
         conn.execute(
-            "REPLACE INTO lists (room, title_id, title, year, type_label, image, rating, added_at, watched) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "REPLACE INTO lists (room, title_id, title, year, type_label, image, rating, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 room,
                 title_id,
@@ -255,29 +233,7 @@ def api_add() -> Any:
                 data.get("image"),
                 data.get("rating"),
                 int(time.time()),
-                watched,
             ),
-        )
-        conn.commit()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/api/list", methods=["PATCH"])
-def api_update() -> Any:
-    if not request.is_json:
-        return jsonify({"error": "invalid_payload"}), 400
-    room = _room_from_request()
-    if not room:
-        return jsonify({"error": "missing_room"}), 400
-    title_id = request.json.get("title_id")
-    watched = _parse_watched(request.json.get("watched"))
-    if not title_id:
-        return jsonify({"error": "missing_title_id"}), 400
-    with _get_db() as conn:
-        _migrate_db(conn)
-        conn.execute(
-            "UPDATE lists SET watched = ? WHERE room = ? AND title_id = ?",
-            (watched, room, title_id),
         )
         conn.commit()
     return jsonify({"status": "ok"})
@@ -294,7 +250,6 @@ def api_delete() -> Any:
     if not title_id:
         return jsonify({"error": "missing_title_id"}), 400
     with _get_db() as conn:
-        _migrate_db(conn)
         conn.execute(
             "DELETE FROM lists WHERE room = ? AND title_id = ?",
             (room, title_id),
