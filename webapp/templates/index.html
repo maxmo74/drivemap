@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shared Watchlist</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Shared Watchlist</h1>
+          <p class="subtitle">Share this URL to collaborate with friends. No accounts needed.</p>
+        </div>
+        <div class="room-badge">
+          <span>Room</span>
+          <strong id="room-id">{{ room }}</strong>
+        </div>
+      </header>
+
+      <section class="search-panel">
+        <label for="search-input">Search IMDB</label>
+        <div class="search-row">
+          <input id="search-input" type="search" placeholder="Search for a movie or show" />
+          <button id="search-button">Search</button>
+        </div>
+        <div id="search-results" class="results-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="list-panel">
+        <div class="list-header">
+          <div class="tabs" role="tablist">
+            <button id="tab-watchlist" class="tab active" role="tab">Watchlist</button>
+            <button id="tab-watched" class="tab" role="tab">Watched</button>
+          </div>
+          <button id="refresh-button" class="ghost">Refresh</button>
+        </div>
+        <div id="list-results" class="list-grid"></div>
+      </section>
+    </main>
+
+    <template id="result-card-template">
+      <article class="card">
+        <img class="card-image" alt="" />
+        <div class="card-body">
+          <div class="card-row">
+            <h3 class="card-title"></h3>
+            <p class="card-rating"></p>
+          </div>
+          <p class="card-meta"></p>
+          <div class="card-actions">
+            <button class="card-action primary">Add</button>
+            <button class="card-action secondary">Watched</button>
+            <button class="card-action danger">Remove</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script>
+      window.APP_ROOM = "{{ room }}";
+    </script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
