@@ -18,6 +18,7 @@ CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 USER_AGENT = "drivemap-movielist/1.0 (+https://example.com)"
+APP_VERSION = "1.0.0"
 
 app = Flask(__name__)
 
@@ -183,7 +184,7 @@ def root() -> Any:
 def room(room: str) -> Any:
     if room == "new":
         return redirect(f"/r/{_default_room()}")
-    return render_template("index.html", room=room)
+    return render_template("index.html", room=room, app_version=APP_VERSION)
 
 
 @app.route("/api/search")
