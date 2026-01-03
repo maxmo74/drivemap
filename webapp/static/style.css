@@ -55,6 +55,27 @@ header h1 {
   font-size: 0.95rem;
 }
 
+.badge-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.version-badge {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.version-badge strong {
+  font-size: 0.95rem;
+}
+
 .search-panel,
 .list-panel {
   background: rgba(15, 23, 42, 0.6);
