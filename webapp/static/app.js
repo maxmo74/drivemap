@@ -119,6 +119,11 @@ const debounceSearch = () => {
   searchTimer = setTimeout(fetchSearch, 200);
 };
 
+const debounceSearch = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(fetchSearch, 350);
+};
+
 const loadList = async () => {
   showStatus(listResults, 'Loading list...');
   const response = await fetch(`/api/list?room=${encodeURIComponent(room)}&status=${activeTab}`);
