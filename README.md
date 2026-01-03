@@ -8,7 +8,7 @@ This repository now contains two utilities:
 ## Shared watchlist web app
 
 A lightweight web app that lets anyone with the URL create a shared movie/show list. It
-uses IMDB search results (including thumbnails), live suggestions, and IMDB ratings.
+uses IMDB search results (including thumbnails) and fetches IMDB ratings.
 
 To run it:
 

@@ -5,9 +5,7 @@ shared by URL (no accounts required).
 
 ## Features
 - Search IMDB titles with thumbnails and ratings.
-- Live search suggestions while typing.
 - Add/remove titles to a shared list stored by room ID.
-- Toggle between watchlist and watched items.
 - Mobile-friendly layout with responsive cards.
 
 ## Running locally
