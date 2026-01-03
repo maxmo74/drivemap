@@ -19,6 +19,7 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 USER_AGENT = "drivemap-movielist/1.0 (+https://example.com)"
 APP_VERSION = "1.0.0"
+ALLOWED_TYPE_LABELS = {"movie", "tvSeries", "tvMiniSeries", "tvMovie"}
 
 app = Flask(__name__)
 
@@ -126,11 +127,14 @@ def parse_suggestion_item(item: dict[str, Any]) -> SearchResult | None:
     title_id = item.get("id")
     if not title_id:
         return None
+    type_label = item.get("q")
+    if type_label not in ALLOWED_TYPE_LABELS:
+        return None
     return SearchResult(
         title_id=title_id,
         title=item.get("l") or "Untitled",
         year=str(item.get("y")) if item.get("y") else None,
-        type_label=item.get("q"),
+        type_label=type_label,
         image=item.get("i", {}).get("imageUrl"),
         rating=get_rating(title_id),
     )

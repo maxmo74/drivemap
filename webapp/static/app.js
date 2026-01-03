@@ -10,6 +10,7 @@ const cardTemplate = document.getElementById('result-card-template');
 
 let activeTab = 'unwatched';
 let searchTimer;
+let activeSearchController;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -92,13 +93,30 @@ const fetchSearch = async () => {
     return;
   }
   showStatus(searchResults, 'Searching...');
-  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-  if (!response.ok) {
-    showStatus(searchResults, 'Search failed. Try again later.');
-    return;
+  if (activeSearchController) {
+    activeSearchController.abort();
   }
-  const data = await response.json();
-  renderSearchResults(data.results || []);
+  activeSearchController = new AbortController();
+  try {
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+      signal: activeSearchController.signal
+    });
+    if (!response.ok) {
+      showStatus(searchResults, 'Search failed. Try again later.');
+      return;
+    }
+    const data = await response.json();
+    renderSearchResults(data.results || []);
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      showStatus(searchResults, 'Search failed. Try again later.');
+    }
+  }
+};
+
+const debounceSearch = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(fetchSearch, 200);
 };
 
 const debounceSearch = () => {
