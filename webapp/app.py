@@ -318,8 +318,8 @@ def api_add() -> Any:
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/list", methods=["PATCH"])
-def api_update() -> Any:
+@app.route("/api/list", methods=["PATCH"], endpoint="api_list_patch")
+def api_patch_list() -> Any:
     if not request.is_json:
         return jsonify({"error": "invalid_payload"}), 400
     room = _room_from_request()
@@ -356,27 +356,6 @@ def api_order() -> Any:
                 "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
                 (index, room, title_id),
             )
-        conn.commit()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/api/list", methods=["PATCH"])
-def api_update() -> Any:
-    if not request.is_json:
-        return jsonify({"error": "invalid_payload"}), 400
-    room = _room_from_request()
-    if not room:
-        return jsonify({"error": "missing_room"}), 400
-    title_id = request.json.get("title_id")
-    watched = _parse_watched(request.json.get("watched"))
-    if not title_id:
-        return jsonify({"error": "missing_title_id"}), 400
-    with _get_db() as conn:
-        _migrate_db(conn)
-        conn.execute(
-            "UPDATE lists SET watched = ? WHERE room = ? AND title_id = ?",
-            (watched, room, title_id),
-        )
         conn.commit()
     return jsonify({"status": "ok"})
 
