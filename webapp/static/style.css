@@ -312,6 +312,9 @@ button.ghost {
   min-width: 180px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.4);
   z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .menu-item {
@@ -324,6 +327,21 @@ button.ghost {
 
 .menu-item strong {
   color: #e2e8f0;
+}
+
+.menu-action {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #e2e8f0;
+  border-radius: var(--radius);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.menu-action:hover {
+  border-color: rgba(56, 189, 248, 0.7);
+  color: #e0f2fe;
 }
 
 @media (max-width: 700px) {

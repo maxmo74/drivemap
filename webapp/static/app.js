@@ -7,6 +7,8 @@ const refreshButton = document.getElementById('refresh-button');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
+const changeListButton = document.getElementById('change-list-id');
+const menu = document.querySelector('.menu');
 
 let activeTab = 'unwatched';
 let searchTimer;
@@ -22,6 +24,12 @@ let isReordering = false;
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
 };
+
+const sanitizeRoom = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '');
 
 const buildCard = (item, mode) => {
   const card = cardTemplate.content.cloneNode(true);
@@ -353,6 +361,22 @@ searchInput.addEventListener('keydown', (event) => {
   }
 });
 refreshButton.addEventListener('click', loadList);
+if (changeListButton) {
+  changeListButton.addEventListener('click', () => {
+    const nextRoomInput = window.prompt('Change List ID', room);
+    if (nextRoomInput === null) {
+      return;
+    }
+    const nextRoom = sanitizeRoom(nextRoomInput);
+    if (!nextRoom || nextRoom === room) {
+      return;
+    }
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    window.location.href = `/r/${encodeURIComponent(nextRoom)}`;
+  });
+}
 
 tabWatchlist.addEventListener('click', () => setActiveTab('unwatched'));
 tabWatched.addEventListener('click', () => setActiveTab('watched'));
