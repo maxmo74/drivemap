@@ -50,16 +50,27 @@ const buildCard = (item, mode) => {
   rating.textContent = item.rating ? `IMDB ${item.rating}` : 'IMDB rating unavailable';
 
   if (mode === 'search') {
-    addButton.textContent = 'Add';
-    watchedButton.textContent = 'Add as watched';
+    addButton.textContent = '＋';
+    addButton.setAttribute('aria-label', 'Add to watchlist');
+    addButton.title = 'Add to watchlist';
+    watchedButton.textContent = '✓';
+    watchedButton.setAttribute('aria-label', 'Add as watched');
+    watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
-    addButton.textContent = item.watched ? 'Move to watchlist' : 'Mark watched';
+    addButton.textContent = item.watched ? '↺' : '✓';
+    addButton.setAttribute(
+      'aria-label',
+      item.watched ? 'Move to watchlist' : 'Mark watched'
+    );
+    addButton.title = item.watched ? 'Move to watchlist' : 'Mark watched';
     watchedButton.remove();
-    removeButton.textContent = 'Remove';
+    removeButton.textContent = '✕';
+    removeButton.setAttribute('aria-label', 'Remove');
+    removeButton.title = 'Remove';
     addButton.addEventListener('click', () => toggleWatched(item));
     removeButton.addEventListener('click', () => removeFromList(item));
     if (activeTab !== 'unwatched') {
@@ -199,10 +210,13 @@ const onDragMove = (event) => {
   if (!draggingCard) {
     return;
   }
+  event.preventDefault();
   draggingOffsetY = event.clientY - draggingStartY;
   draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
-  const target = document.elementFromPoint(event.clientX, event.clientY);
-  const targetCard = target ? target.closest('.card') : null;
+  const hoveredCards = document.elementsFromPoint(event.clientX, event.clientY);
+  const targetCard = hoveredCards
+    .map((node) => node.closest?.('.card'))
+    .find((card) => card && card !== draggingCard && card.parentElement === listResults);
   if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
     return;
   }
@@ -268,8 +282,10 @@ const attachDragHandlers = () => {
       draggingPointerId = event.pointerId;
       draggingStartY = event.clientY;
       draggingOffsetY = 0;
+      listResults.classList.add('is-dragging');
       card.classList.add('dragging');
       event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
     });
     handle.addEventListener('pointermove', (event) => {
       if (draggingPointerId !== event.pointerId) {
@@ -282,6 +298,7 @@ const attachDragHandlers = () => {
         return;
       }
       event.currentTarget.releasePointerCapture(event.pointerId);
+      listResults.classList.remove('is-dragging');
       onDragEnd();
     });
     handle.addEventListener('pointercancel', (event) => {
@@ -289,6 +306,7 @@ const attachDragHandlers = () => {
         return;
       }
       event.currentTarget.releasePointerCapture(event.pointerId);
+      listResults.classList.remove('is-dragging');
       onDragEnd();
     });
   });
