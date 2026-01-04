@@ -19,7 +19,7 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 USER_AGENT = "drivemap-movielist/1.0 (+https://example.com)"
 APP_VERSION = "1.0.0"
-ALLOWED_TYPE_LABELS = {"movie", "tvSeries", "tvMiniSeries", "tvMovie"}
+ALLOWED_TYPE_LABELS = {"feature", "movie", "tvSeries", "tvMiniSeries", "tvMovie"}
 
 app = Flask(__name__)
 
@@ -66,6 +66,7 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(lists)")}
     if "watched" not in columns:
         conn.execute("ALTER TABLE lists ADD COLUMN watched INTEGER NOT NULL DEFAULT 0")
+    conn.execute("UPDATE lists SET watched = 0 WHERE watched IS NULL")
 
 
 def init_db() -> None:
