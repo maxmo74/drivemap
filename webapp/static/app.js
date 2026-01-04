@@ -8,7 +8,6 @@ const trendingResults = document.getElementById('trending-results');
 const trendingModal = document.getElementById('trending-modal');
 const trendingModalClose = document.getElementById('trending-modal-close');
 const listResults = document.getElementById('list-results');
-const refreshButton = document.getElementById('refresh-button');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
@@ -21,6 +20,9 @@ const renameModalInput = document.getElementById('rename-modal-input');
 const renameModalCancel = document.getElementById('rename-modal-cancel');
 const renameModalConfirm = document.getElementById('rename-modal-confirm');
 const renameModalClose = document.getElementById('rename-modal-close');
+const imageModal = document.getElementById('image-modal');
+const imageModalClose = document.getElementById('image-modal-close');
+const imageModalImage = document.getElementById('image-modal-image');
 
 const MAX_RESULTS = 10;
 let activeTab = 'unwatched';
@@ -28,6 +30,7 @@ let searchTimer;
 let activeSearchController;
 let lastSearchQuery = '';
 let lastSearchResults = [];
+let dragSource = null;
 let draggingCard = null;
 let draggingPointerId = null;
 let draggingStartY = 0;
@@ -39,6 +42,37 @@ let dragOriginRect = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
+};
+
+const getLargeImage = (url) => {
+  if (!url) {
+    return 'https://via.placeholder.com/500x750?text=No+Image';
+  }
+  if (url.includes('._V1_')) {
+    return url.replace(/_UX\d+_CR0,0,\d+,\d+_AL_/i, '_UX500_CR0,0,500,750_AL_');
+  }
+  return url;
+};
+
+const openImageModal = (src, alt) => {
+  if (!imageModal || !imageModalImage) {
+    return;
+  }
+  imageModalImage.src = src;
+  imageModalImage.alt = alt;
+  imageModal.classList.add('is-visible');
+  imageModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeImageModal = () => {
+  if (!imageModal) {
+    return;
+  }
+  imageModal.classList.remove('is-visible');
+  imageModal.setAttribute('aria-hidden', 'true');
+  if (imageModalImage) {
+    imageModalImage.src = '';
+  }
 };
 
 const openSearchModal = () => {
@@ -96,6 +130,9 @@ const buildCard = (item, mode) => {
   image.alt = `${item.title} poster`;
   title.textContent = item.title;
   title.href = `https://www.imdb.com/title/${item.title_id}/`;
+  image.addEventListener('click', () => {
+    openImageModal(getLargeImage(item.image), `${item.title} poster`);
+  });
   const parts = [];
   if (item.type_label) {
     parts.push(item.type_label.toUpperCase());
@@ -104,7 +141,18 @@ const buildCard = (item, mode) => {
     parts.push(item.year);
   }
   meta.textContent = parts.join(' • ') || 'Unknown';
-  rating.textContent = item.rating ? `IMDB ${item.rating}` : 'IMDB rating unavailable';
+  const imdbRating = item.rating || 'N/A';
+  const rottenRating = item.rotten_tomatoes || 'N/A';
+  rating.innerHTML = `
+    <span class="rating-badge">
+      <img src="/static/imdb-logo.svg" alt="IMDb" />
+      <span>${imdbRating}</span>
+    </span>
+    <span class="rating-badge">
+      <img src="/static/rotten-tomatoes.svg" alt="Rotten Tomatoes" />
+      <span>${rottenRating}</span>
+    </span>
+  `;
 
   if (mode === 'search') {
     addButton.textContent = '＋';
@@ -118,6 +166,9 @@ const buildCard = (item, mode) => {
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
+    article.setAttribute('draggable', 'true');
+    article.addEventListener('dragstart', onCardDragStart);
+    article.addEventListener('dragend', onCardDragEnd);
     addButton.textContent = item.watched ? '↺' : '✓';
     addButton.setAttribute(
       'aria-label',
@@ -130,9 +181,6 @@ const buildCard = (item, mode) => {
     removeButton.title = 'Remove';
     addButton.addEventListener('click', () => toggleWatched(item));
     removeButton.addEventListener('click', () => removeFromList(item));
-    if (activeTab !== 'unwatched') {
-      dragHandle.remove();
-    }
   }
 
   return card;
@@ -325,7 +373,7 @@ const syncOrder = async () => {
   }
 };
 
-const onDragMove = (event) => {
+const onTouchDragMove = (event) => {
   if (!draggingCard) {
     return;
   }
@@ -374,7 +422,7 @@ const onDragMove = (event) => {
   });
 };
 
-const onDragEnd = async () => {
+const onTouchDragEnd = async () => {
   if (!draggingCard) {
     return;
   }
@@ -398,73 +446,96 @@ const onDragEnd = async () => {
   draggingOffsetY = 0;
   dragOriginRect = null;
   listResults.classList.remove('is-reordering');
+  listResults.classList.remove('is-dragging');
   isReordering = false;
   await syncOrder();
 };
 
-const stopDragListeners = () => {
+const stopTouchDragListeners = () => {
   if (!activeDragHandle || draggingPointerId === null) {
     return;
   }
   activeDragHandle.releasePointerCapture(draggingPointerId);
-  document.removeEventListener('pointermove', onDragMove);
-  document.removeEventListener('pointerup', onDragPointerUp);
-  document.removeEventListener('pointercancel', onDragPointerCancel);
-  listResults.classList.remove('is-dragging');
+  document.removeEventListener('pointermove', onTouchDragMove);
+  document.removeEventListener('pointerup', onTouchDragPointerUp);
+  document.removeEventListener('pointercancel', onTouchDragPointerCancel);
   activeDragHandle = null;
 };
 
-const onDragPointerUp = (event) => {
+const onTouchDragPointerUp = (event) => {
   if (draggingPointerId !== event.pointerId) {
     return;
   }
-  stopDragListeners();
-  onDragEnd();
+  stopTouchDragListeners();
+  onTouchDragEnd();
 };
 
-const onDragPointerCancel = (event) => {
+const onTouchDragPointerCancel = (event) => {
   if (draggingPointerId !== event.pointerId) {
     return;
   }
-  stopDragListeners();
-  onDragEnd();
+  stopTouchDragListeners();
+  onTouchDragEnd();
+};
+
+const onCardDragStart = (event) => {
+  if (event.target.closest('.card-action')) {
+    event.preventDefault();
+    return;
+  }
+  dragSource = event.currentTarget;
+  dragSource.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', dragSource.dataset.titleId || '');
+};
+
+const onCardDragEnd = async () => {
+  if (!dragSource) {
+    return;
+  }
+  dragSource.classList.remove('dragging');
+  dragSource = null;
+  await syncOrder();
 };
 
 const attachDragHandlers = () => {
-  if (activeTab !== 'unwatched') {
-    return;
-  }
-  listResults.querySelectorAll('.card-drag-handle').forEach((handle) => {
-    handle.addEventListener('pointerdown', (event) => {
-      const card = event.currentTarget.closest('.card');
-      if (!card) {
-        return;
-      }
-      if (draggingCard) {
-        stopDragListeners();
-      }
-      draggingCard = card;
-      draggingPointerId = event.pointerId;
-      dragOriginRect = card.getBoundingClientRect();
-      draggingStartY = event.clientY;
-      draggingOffsetY = 0;
-      activeDragHandle = event.currentTarget;
-      listResults.classList.add('is-dragging');
-      card.classList.add('dragging');
-      dragPlaceholder = document.createElement('div');
-      dragPlaceholder.className = 'card drag-placeholder';
-      dragPlaceholder.style.height = `${dragOriginRect.height}px`;
-      dragPlaceholder.style.width = `${dragOriginRect.width}px`;
-      listResults.insertBefore(dragPlaceholder, card.nextSibling);
-      card.style.position = 'fixed';
-      card.style.left = `${dragOriginRect.left}px`;
-      card.style.top = `${dragOriginRect.top}px`;
-      card.style.width = `${dragOriginRect.width}px`;
-      event.currentTarget.setPointerCapture(event.pointerId);
-      document.addEventListener('pointermove', onDragMove);
-      document.addEventListener('pointerup', onDragPointerUp);
-      document.addEventListener('pointercancel', onDragPointerCancel);
-      event.preventDefault();
+  listResults.querySelectorAll('.card').forEach((card) => {
+    card.setAttribute('draggable', 'true');
+    card.querySelectorAll('.card-drag-handle').forEach((handle) => {
+      handle.addEventListener('pointerdown', (event) => {
+        if (event.pointerType !== 'touch') {
+          return;
+        }
+        const targetCard = event.currentTarget.closest('.card');
+        if (!targetCard) {
+          return;
+        }
+        if (draggingCard) {
+          stopTouchDragListeners();
+        }
+        draggingCard = targetCard;
+        draggingPointerId = event.pointerId;
+        dragOriginRect = targetCard.getBoundingClientRect();
+        draggingStartY = event.clientY;
+        draggingOffsetY = 0;
+        activeDragHandle = event.currentTarget;
+        listResults.classList.add('is-dragging');
+        targetCard.classList.add('dragging');
+        dragPlaceholder = document.createElement('div');
+        dragPlaceholder.className = 'card drag-placeholder';
+        dragPlaceholder.style.height = `${dragOriginRect.height}px`;
+        dragPlaceholder.style.width = `${dragOriginRect.width}px`;
+        listResults.insertBefore(dragPlaceholder, targetCard.nextSibling);
+        targetCard.style.position = 'fixed';
+        targetCard.style.left = `${dragOriginRect.left}px`;
+        targetCard.style.top = `${dragOriginRect.top}px`;
+        targetCard.style.width = `${dragOriginRect.width}px`;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        document.addEventListener('pointermove', onTouchDragMove, { passive: false });
+        document.addEventListener('pointerup', onTouchDragPointerUp);
+        document.addEventListener('pointercancel', onTouchDragPointerCancel);
+        event.preventDefault();
+      });
     });
   });
 };
@@ -529,8 +600,16 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && trendingModal?.classList.contains('is-visible')) {
     closeTrendingModal();
   }
+  if (event.key === 'Escape' && imageModal?.classList.contains('is-visible')) {
+    closeImageModal();
+  }
 });
-refreshButton.addEventListener('click', loadList);
+imageModalClose?.addEventListener('click', closeImageModal);
+imageModal?.addEventListener('click', (event) => {
+  if (event.target === imageModal) {
+    closeImageModal();
+  }
+});
 if (changeListButton) {
   const closeRenameModal = () => {
     if (!renameModal) {
@@ -611,3 +690,17 @@ tabWatched.addEventListener('click', () => setActiveTab('watched'));
 
 loadList();
 renderSearchResults([]);
+
+listResults?.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  const targetCard = event.target.closest('.card');
+  if (!dragSource || !targetCard || targetCard === dragSource) {
+    return;
+  }
+  if (targetCard.parentElement !== listResults) {
+    return;
+  }
+  const rect = targetCard.getBoundingClientRect();
+  const insertBefore = event.clientY < rect.top + rect.height / 2;
+  listResults.insertBefore(dragSource, insertBefore ? targetCard : targetCard.nextSibling);
+});
