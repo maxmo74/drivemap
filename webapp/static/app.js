@@ -90,6 +90,8 @@ const buildCard = (item, mode) => {
   const watchedButton = card.querySelector('.card-action.secondary');
   const removeButton = card.querySelector('.card-action.danger');
   const dragHandle = card.querySelector('.card-drag-handle');
+  const moveUpButton = card.querySelector('.card-action.move-up');
+  const moveDownButton = card.querySelector('.card-action.move-down');
 
   article.dataset.titleId = item.title_id;
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
@@ -104,7 +106,18 @@ const buildCard = (item, mode) => {
     parts.push(item.year);
   }
   meta.textContent = parts.join(' • ') || 'Unknown';
-  rating.textContent = item.rating ? `IMDB ${item.rating}` : 'IMDB rating unavailable';
+  const imdbRating = item.rating || 'N/A';
+  const rottenRating = item.rotten_tomatoes || 'N/A';
+  rating.innerHTML = `
+    <span class="rating-badge">
+      <img src="/static/imdb-logo.svg" alt="IMDb" />
+      <span>${imdbRating}</span>
+    </span>
+    <span class="rating-badge">
+      <img src="/static/rotten-tomatoes.svg" alt="Rotten Tomatoes" />
+      <span>${rottenRating}</span>
+    </span>
+  `;
 
   if (mode === 'search') {
     addButton.textContent = '＋';
@@ -115,6 +128,8 @@ const buildCard = (item, mode) => {
     watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
+    moveUpButton.remove();
+    moveDownButton.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
@@ -132,6 +147,13 @@ const buildCard = (item, mode) => {
     removeButton.addEventListener('click', () => removeFromList(item));
     if (activeTab !== 'unwatched') {
       dragHandle.remove();
+      moveUpButton.remove();
+      moveDownButton.remove();
+    } else {
+      moveUpButton.title = 'Move up';
+      moveDownButton.title = 'Move down';
+      moveUpButton.addEventListener('click', () => moveCard(article, 'up'));
+      moveDownButton.addEventListener('click', () => moveCard(article, 'down'));
     }
   }
 
@@ -323,6 +345,22 @@ const syncOrder = async () => {
   if (!response.ok) {
     alert('Failed to save order.');
   }
+};
+
+const moveCard = async (cardElement, direction) => {
+  if (!cardElement) {
+    return;
+  }
+  const target =
+    direction === 'up' ? cardElement.previousElementSibling : cardElement.nextElementSibling;
+  if (!target || !target.classList.contains('card')) {
+    return;
+  }
+  listResults.insertBefore(
+    cardElement,
+    direction === 'up' ? target : target.nextElementSibling
+  );
+  await syncOrder();
 };
 
 const onDragMove = (event) => {
