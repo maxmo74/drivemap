@@ -20,6 +20,7 @@ let draggingPointerId = null;
 let draggingStartY = 0;
 let draggingOffsetY = 0;
 let isReordering = false;
+let activeDragHandle = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -276,6 +277,34 @@ const onDragEnd = async () => {
   await syncOrder();
 };
 
+const stopDragListeners = () => {
+  if (!activeDragHandle || draggingPointerId === null) {
+    return;
+  }
+  activeDragHandle.releasePointerCapture(draggingPointerId);
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragPointerUp);
+  document.removeEventListener('pointercancel', onDragPointerCancel);
+  listResults.classList.remove('is-dragging');
+  activeDragHandle = null;
+};
+
+const onDragPointerUp = (event) => {
+  if (draggingPointerId !== event.pointerId) {
+    return;
+  }
+  stopDragListeners();
+  onDragEnd();
+};
+
+const onDragPointerCancel = (event) => {
+  if (draggingPointerId !== event.pointerId) {
+    return;
+  }
+  stopDragListeners();
+  onDragEnd();
+};
+
 const attachDragHandlers = () => {
   if (activeTab !== 'unwatched') {
     return;
@@ -286,36 +315,21 @@ const attachDragHandlers = () => {
       if (!card) {
         return;
       }
+      if (draggingCard) {
+        stopDragListeners();
+      }
       draggingCard = card;
       draggingPointerId = event.pointerId;
       draggingStartY = event.clientY;
       draggingOffsetY = 0;
+      activeDragHandle = event.currentTarget;
       listResults.classList.add('is-dragging');
       card.classList.add('dragging');
       event.currentTarget.setPointerCapture(event.pointerId);
+      document.addEventListener('pointermove', onDragMove);
+      document.addEventListener('pointerup', onDragPointerUp);
+      document.addEventListener('pointercancel', onDragPointerCancel);
       event.preventDefault();
-    });
-    handle.addEventListener('pointermove', (event) => {
-      if (draggingPointerId !== event.pointerId) {
-        return;
-      }
-      onDragMove(event);
-    });
-    handle.addEventListener('pointerup', (event) => {
-      if (draggingPointerId !== event.pointerId) {
-        return;
-      }
-      event.currentTarget.releasePointerCapture(event.pointerId);
-      listResults.classList.remove('is-dragging');
-      onDragEnd();
-    });
-    handle.addEventListener('pointercancel', (event) => {
-      if (draggingPointerId !== event.pointerId) {
-        return;
-      }
-      event.currentTarget.releasePointerCapture(event.pointerId);
-      listResults.classList.remove('is-dragging');
-      onDragEnd();
     });
   });
 };
