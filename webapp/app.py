@@ -18,7 +18,7 @@ CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
 
 app = Flask(__name__)
@@ -227,6 +227,13 @@ def _room_from_request() -> str:
     return room
 
 
+def _sanitize_room(value: str | None) -> str:
+    if not value:
+        return ""
+    value = value.strip().lower()
+    return re.sub(r"[^a-z0-9-]", "", value)
+
+
 def _default_room() -> str:
     entropy = os.urandom(10)
     return hashlib.sha256(entropy).hexdigest()[:10]
@@ -383,6 +390,39 @@ def api_delete() -> Any:
         )
         conn.commit()
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/list/rename", methods=["PATCH"])
+def api_rename_list() -> Any:
+    if not request.is_json:
+        return jsonify({"error": "invalid_payload"}), 400
+    room = _room_from_request()
+    if not room:
+        return jsonify({"error": "missing_room"}), 400
+    next_room = _sanitize_room(request.json.get("next_room"))
+    if not next_room:
+        return jsonify({"error": "missing_next_room"}), 400
+    if next_room == room:
+        return jsonify({"status": "ok", "room": room})
+    with _get_db() as conn:
+        _migrate_db(conn)
+        existing = conn.execute(
+            "SELECT 1 FROM lists WHERE room = ? LIMIT 1",
+            (next_room,),
+        ).fetchone()
+        if existing:
+            return (
+                jsonify(
+                    {
+                        "error": "room_exists",
+                        "message": "That List ID already exists. Pick another name.",
+                    }
+                ),
+                409,
+            )
+        conn.execute("UPDATE lists SET room = ? WHERE room = ?", (next_room, room))
+        conn.commit()
+    return jsonify({"status": "ok", "room": next_room})
 
 
 if __name__ == "__main__":
