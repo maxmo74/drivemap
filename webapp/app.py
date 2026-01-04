@@ -704,7 +704,7 @@ def api_list() -> Any:
             """
             SELECT * FROM lists
             WHERE room = ? AND watched = ?
-            ORDER BY (position IS NULL) ASC, position ASC, added_at DESC
+            ORDER BY (position IS NULL) ASC, position DESC, added_at DESC
             LIMIT ? OFFSET ?
             """,
             (room, watched_flag, per_page, offset),
@@ -737,7 +737,7 @@ def api_add() -> Any:
     with _get_db() as conn:
         _migrate_db(conn)
         next_position = conn.execute(
-            "SELECT COALESCE(MIN(position), 0) - 1 FROM lists WHERE room = ? AND watched = ?",
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM lists WHERE room = ? AND watched = ?",
             (room, watched),
         ).fetchone()[0]
         conn.execute(
@@ -805,17 +805,9 @@ def api_order() -> Any:
         return jsonify({"error": "invalid_order"}), 400
     with _get_db() as conn:
         _migrate_db(conn)
-        placeholders = ",".join("?" for _ in order)
-        rows = conn.execute(
-            f"SELECT title_id, position FROM lists WHERE room = ? AND title_id IN ({placeholders})",
-            (room, *order),
-        ).fetchall()
-        position_map = {row["title_id"]: row["position"] for row in rows}
-        sorted_positions = sorted(
-            position for position in position_map.values() if position is not None
-        )
+        total = len(order)
         for index, title_id in enumerate(order):
-            position = sorted_positions[index] if index < len(sorted_positions) else index + 1
+            position = total - index
             conn.execute(
                 "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
                 (position, room, title_id),
