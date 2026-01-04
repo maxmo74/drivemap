@@ -19,7 +19,7 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 OMDB_URL = "https://www.omdbapi.com/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
@@ -349,29 +349,38 @@ def get_rotten_tomatoes(title_id: str, user_agent: str) -> str | None:
     return rotten_rating
 
 
-def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult | None:
+def _normalize_type_label(type_label: str | None) -> str:
+    if not type_label:
+        return ""
+    return re.sub(r"[^a-z]", "", type_label.lower())
+
+
+def parse_suggestion_item(
+    item: dict[str, Any], user_agent: str, include_details: bool = True
+) -> SearchResult | None:
     title_id = item.get("id")
     if not title_id:
         return None
     type_label = item.get("qid") or item.get("q")
-    if type_label:
-        normalized_type = re.sub(r"[^a-z]", "", type_label.lower())
-    else:
-        normalized_type = ""
+    normalized_type = _normalize_type_label(type_label)
     if normalized_type not in ALLOWED_TYPE_LABELS:
         return None
     image_url = item.get("i", {}).get("imageUrl")
-    runtime_minutes, total_seasons, total_episodes, avg_episode_length = get_metadata(
-        title_id, user_agent, normalized_type
-    )
+    runtime_minutes = total_seasons = total_episodes = avg_episode_length = None
+    rating = rotten_tomatoes = None
+    if include_details:
+        runtime_minutes, total_seasons, total_episodes, avg_episode_length = get_metadata(
+            title_id, user_agent, normalized_type
+        )
+        rating, rotten_tomatoes = get_ratings(title_id, user_agent)
     return SearchResult(
         title_id=title_id,
         title=item.get("l") or "Untitled",
         year=str(item.get("y")) if item.get("y") else None,
         type_label=type_label,
         image=_shrink_image_url(image_url),
-        rating=get_rating(title_id, user_agent),
-        rotten_tomatoes=get_rotten_tomatoes(title_id, user_agent),
+        rating=rating,
+        rotten_tomatoes=rotten_tomatoes,
         runtime_minutes=runtime_minutes,
         total_seasons=total_seasons,
         total_episodes=total_episodes,
@@ -407,7 +416,7 @@ def fetch_suggestions(query: str, user_agent: str) -> list[SearchResult]:
     items: Iterable[dict[str, Any]] = payload.get("d", [])
     results: list[SearchResult] = []
     for item in items:
-        parsed = parse_suggestion_item(item, user_agent)
+        parsed = parse_suggestion_item(item, user_agent, include_details=False)
         if parsed:
             results.append(parsed)
     return results
@@ -425,7 +434,7 @@ def fetch_title_by_id(title_id: str, user_agent: str) -> SearchResult | None:
     items: Iterable[dict[str, Any]] = payload.get("d", [])
     for item in items:
         if item.get("id") == title_id:
-            return parse_suggestion_item(item, user_agent)
+            return parse_suggestion_item(item, user_agent, include_details=False)
     return None
 
 
@@ -522,6 +531,32 @@ def api_search() -> Any:
     return jsonify({"results": [serialize_result(result) for result in results[:MAX_RESULTS]]})
 
 
+@app.route("/api/details")
+def api_details() -> Any:
+    title_id = request.args.get("title_id")
+    if not title_id:
+        return jsonify({"error": "missing_title_id"}), 400
+    type_label = request.args.get("type_label")
+    normalized_type = _normalize_type_label(type_label)
+    if normalized_type not in ALLOWED_TYPE_LABELS:
+        normalized_type = "movie"
+    user_agent = _request_user_agent()
+    runtime_minutes, total_seasons, total_episodes, avg_episode_length = get_metadata(
+        title_id, user_agent, normalized_type
+    )
+    rating, rotten_tomatoes = get_ratings(title_id, user_agent)
+    return jsonify(
+        {
+            "rating": rating,
+            "rotten_tomatoes": rotten_tomatoes,
+            "runtime_minutes": runtime_minutes,
+            "total_seasons": total_seasons,
+            "total_episodes": total_episodes,
+            "avg_episode_length": avg_episode_length,
+        }
+    )
+
+
 @app.route("/api/trending")
 def api_trending() -> Any:
     user_agent = _request_user_agent()
@@ -539,13 +574,34 @@ def api_list() -> Any:
         return jsonify({"error": "missing_room"}), 400
     status = request.args.get("status", "unwatched")
     watched_flag = 1 if status == "watched" else 0
+    page = max(int(request.args.get("page", 1)), 1)
+    per_page = max(int(request.args.get("per_page", MAX_RESULTS)), 1)
+    offset = (page - 1) * per_page
     with _get_db() as conn:
         _migrate_db(conn)
-        rows = conn.execute(
-            "SELECT * FROM lists WHERE room = ? AND watched = ? ORDER BY position ASC, added_at DESC",
+        total_count = conn.execute(
+            "SELECT COUNT(*) FROM lists WHERE room = ? AND watched = ?",
             (room, watched_flag),
+        ).fetchone()[0]
+        rows = conn.execute(
+            """
+            SELECT * FROM lists
+            WHERE room = ? AND watched = ?
+            ORDER BY position ASC, added_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (room, watched_flag, per_page, offset),
         ).fetchall()
-    return jsonify({"items": [dict(row) for row in rows]})
+    total_pages = max((total_count + per_page - 1) // per_page, 1)
+    return jsonify(
+        {
+            "items": [dict(row) for row in rows],
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+            "total_count": total_count,
+        }
+    )
 
 
 @app.route("/api/list", methods=["POST"])
@@ -564,7 +620,7 @@ def api_add() -> Any:
     with _get_db() as conn:
         _migrate_db(conn)
         next_position = conn.execute(
-            "SELECT COALESCE(MAX(position), 0) + 1 FROM lists WHERE room = ?",
+            "SELECT COALESCE(MIN(position), 0) - 1 FROM lists WHERE room = ?",
             (room,),
         ).fetchone()[0]
         conn.execute(
@@ -632,10 +688,18 @@ def api_order() -> Any:
         return jsonify({"error": "invalid_order"}), 400
     with _get_db() as conn:
         _migrate_db(conn)
-        for index, title_id in enumerate(order, start=1):
+        placeholders = ",".join("?" for _ in order)
+        rows = conn.execute(
+            f"SELECT title_id, position FROM lists WHERE room = ? AND title_id IN ({placeholders})",
+            (room, *order),
+        ).fetchall()
+        position_map = {row["title_id"]: row["position"] for row in rows}
+        sorted_positions = sorted(position_map.values())
+        for index, title_id in enumerate(order):
+            position = sorted_positions[index] if index < len(sorted_positions) else index + 1
             conn.execute(
                 "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
-                (index, room, title_id),
+                (position, room, title_id),
             )
         conn.commit()
     return jsonify({"status": "ok"})
