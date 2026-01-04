@@ -138,7 +138,7 @@ const filterCachedResults = (query) => {
 
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
-  if (query.length < 4) {
+  if (query.length < 3) {
     renderSearchResults([]);
     lastSearchQuery = '';
     lastSearchResults = [];
@@ -184,7 +184,7 @@ const fetchSearch = async () => {
 const debounceSearch = () => {
   clearTimeout(searchTimer);
   const query = searchInput.value.trim();
-  if (query.length >= 4 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
+  if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
     renderSearchResults(filterCachedResults(query));
   }
   searchTimer = setTimeout(fetchSearch, 1000);
@@ -258,13 +258,13 @@ const onDragMove = (event) => {
     return;
   }
   event.preventDefault();
-  draggingOffsetY = event.clientY - draggingStartY;
-  draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
   const hoveredCards = document.elementsFromPoint(event.clientX, event.clientY);
   const targetCard = hoveredCards
     .map((node) => node.closest?.('.card'))
     .find((card) => card && card !== draggingCard && card.parentElement === listResults);
   if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
+    draggingOffsetY = event.clientY - draggingStartY;
+    draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
     return;
   }
   const cards = Array.from(listResults.querySelectorAll('.card'));
