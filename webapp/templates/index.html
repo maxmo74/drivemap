@@ -11,9 +11,9 @@
       <header class="app-header">
         <div class="brand-row">
           <h1>Shovo</h1>
-          <button class="room-tag" id="room-tag-button" type="button">
-            <span>List</span>
-            <strong id="room-id">{{ room }}</strong>
+          <button class="room-tag room-link" id="room-tag-button" type="button">
+            <span class="room-label">List:</span>
+            <span class="room-name" id="room-id">{{ room }}</span>
           </button>
         </div>
         <div class="header-actions">
@@ -35,6 +35,7 @@
                 <strong id="app-version">{{ app_version }}</strong>
               </div>
               <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
+              <button class="menu-action" id="open-trending" type="button">Trending</button>
             </div>
           </details>
         </div>
@@ -57,10 +58,12 @@
         <img class="card-image" alt="" />
         <div class="card-body">
           <div class="card-row">
-            <h3 class="card-title">
-              <a class="card-title-link" target="_blank" rel="noopener noreferrer"></a>
-            </h3>
-            <p class="card-rating"></p>
+            <div class="card-title-group">
+              <h3 class="card-title">
+                <a class="card-title-link" target="_blank" rel="noopener noreferrer"></a>
+              </h3>
+              <p class="card-rating"></p>
+            </div>
             <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
           </div>
           <p class="card-meta"></p>
@@ -75,13 +78,12 @@
 
     <div class="modal-overlay" id="rename-modal" aria-hidden="true" role="dialog" aria-modal="true">
       <div class="modal">
-        <div class="modal-header">
-          <h2>Rename List ID</h2>
+        <div class="modal-header modal-header--compact">
           <button class="icon-button" id="rename-modal-close" type="button" aria-label="Close rename prompt">
             ×
           </button>
         </div>
-        <p class="modal-subtitle">Pick a new identifier to share this list.</p>
+        <p class="modal-subtitle">Rename List ID</p>
         <input id="rename-modal-input" type="text" autocomplete="off" />
         <div class="modal-actions">
           <button class="ghost" id="rename-modal-cancel" type="button">Cancel</button>
@@ -92,13 +94,23 @@
 
     <div class="modal-overlay" id="search-modal" aria-hidden="true" role="dialog" aria-modal="true">
       <div class="modal search-modal">
-        <div class="modal-header">
-          <h2>Search results</h2>
+        <div class="modal-header modal-header--compact">
           <button class="icon-button" id="search-modal-close" type="button" aria-label="Close search">
             ×
           </button>
         </div>
         <div id="search-results" class="results-grid" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="trending-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal search-modal">
+        <div class="modal-header modal-header--compact">
+          <button class="icon-button" id="trending-modal-close" type="button" aria-label="Close trending">
+            ×
+          </button>
+        </div>
+        <div id="trending-results" class="results-grid" aria-live="polite"></div>
       </div>
     </div>
 
