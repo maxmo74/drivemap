@@ -104,6 +104,13 @@ const filterCachedResults = (query) => {
   );
 };
 
+const filterCachedResults = (query) => {
+  const normalized = query.toLowerCase();
+  return lastSearchResults.filter((item) =>
+    item.title.toLowerCase().includes(normalized)
+  );
+};
+
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
   if (query.length < 2) {
