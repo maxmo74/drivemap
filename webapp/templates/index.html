@@ -17,7 +17,6 @@
               <strong id="room-id">{{ room }}</strong>
             </div>
           </div>
-          <p class="subtitle">Share this list with friends. No accounts needed.</p>
         </div>
         <details class="menu">
           <summary aria-label="Open menu">
@@ -30,7 +29,7 @@
               <span>Version</span>
               <strong id="app-version">{{ app_version }}</strong>
             </div>
-            <button class="menu-action" id="change-list-id" type="button">Change List ID</button>
+            <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
           </div>
         </details>
       </header>
@@ -39,6 +38,7 @@
         <label for="search-input">Search IMDB</label>
         <div class="search-row">
           <input id="search-input" type="search" placeholder="Search for a movie or show" />
+          <button class="clear-search" id="clear-search" type="button" aria-label="Clear search">×</button>
           <button id="search-button">Search</button>
         </div>
         <div id="search-results" class="results-grid" aria-live="polite"></div>
@@ -61,7 +61,9 @@
         <img class="card-image" alt="" />
         <div class="card-body">
           <div class="card-row">
-            <h3 class="card-title"></h3>
+            <h3 class="card-title">
+              <a class="card-title-link" target="_blank" rel="noopener noreferrer"></a>
+            </h3>
             <p class="card-rating"></p>
             <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
           </div>

@@ -1,6 +1,7 @@
 const room = window.APP_ROOM;
 const searchInput = document.getElementById('search-input');
 const searchButton = document.getElementById('search-button');
+const clearSearchButton = document.getElementById('clear-search');
 const searchResults = document.getElementById('search-results');
 const listResults = document.getElementById('list-results');
 const refreshButton = document.getElementById('refresh-button');
@@ -36,7 +37,7 @@ const buildCard = (item, mode) => {
   const card = cardTemplate.content.cloneNode(true);
   const article = card.querySelector('.card');
   const image = card.querySelector('.card-image');
-  const title = card.querySelector('.card-title');
+  const title = card.querySelector('.card-title-link');
   const meta = card.querySelector('.card-meta');
   const rating = card.querySelector('.card-rating');
   const addButton = card.querySelector('.card-action.primary');
@@ -48,6 +49,7 @@ const buildCard = (item, mode) => {
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
   image.alt = `${item.title} poster`;
   title.textContent = item.title;
+  title.href = `https://www.imdb.com/title/${item.title_id}/`;
   const parts = [];
   if (item.type_label) {
     parts.push(item.type_label.toUpperCase());
@@ -93,7 +95,6 @@ const buildCard = (item, mode) => {
 const renderSearchResults = (items) => {
   searchResults.innerHTML = '';
   if (!items.length) {
-    showStatus(searchResults, 'No results yet. Try searching for a title.');
     return;
   }
   items.forEach((item) => {
@@ -130,7 +131,7 @@ const filterCachedResults = (query) => {
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
   if (query.length < 2) {
-    showStatus(searchResults, 'Type at least 2 characters to search.');
+    renderSearchResults([]);
     return;
   }
   if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
@@ -169,6 +170,25 @@ const fetchSearch = async () => {
 const debounceSearch = () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(fetchSearch, 200);
+};
+
+const updateClearButton = () => {
+  if (!clearSearchButton) {
+    return;
+  }
+  clearSearchButton.disabled = searchInput.value.trim().length === 0;
+};
+
+const clearSearch = () => {
+  searchInput.value = '';
+  lastSearchQuery = '';
+  lastSearchResults = [];
+  if (activeSearchController) {
+    activeSearchController.abort();
+    activeSearchController = null;
+  }
+  renderSearchResults([]);
+  updateClearButton();
 };
 
 const loadList = async () => {
@@ -369,20 +389,32 @@ const setActiveTab = (nextTab) => {
 
 searchButton.addEventListener('click', fetchSearch);
 searchInput.addEventListener('input', debounceSearch);
+searchInput.addEventListener('input', updateClearButton);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     fetchSearch();
   }
 });
+clearSearchButton?.addEventListener('click', clearSearch);
 refreshButton.addEventListener('click', loadList);
 if (changeListButton) {
-  changeListButton.addEventListener('click', () => {
-    const nextRoomInput = window.prompt('Change List ID', room);
+  changeListButton.addEventListener('click', async () => {
+    const nextRoomInput = window.prompt('Rename List ID', room);
     if (nextRoomInput === null) {
       return;
     }
     const nextRoom = sanitizeRoom(nextRoomInput);
     if (!nextRoom || nextRoom === room) {
+      return;
+    }
+    const response = await fetch('/api/list/rename', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room, next_room: nextRoom })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      alert(data.message || 'Unable to rename list.');
       return;
     }
     if (menu?.hasAttribute('open')) {
@@ -397,3 +429,4 @@ tabWatched.addEventListener('click', () => setActiveTab('watched'));
 
 loadList();
 renderSearchResults([]);
+updateClearButton();
