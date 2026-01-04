@@ -156,11 +156,6 @@ button.ghost {
   grid-template-columns: 1fr;
 }
 
-.list-grid.is-dragging {
-  touch-action: none;
-  user-select: none;
-}
-
 .card {
   display: flex;
   gap: 0.5rem;
@@ -170,16 +165,13 @@ button.ghost {
   overflow: hidden;
 }
 
-.list-grid.is-reordering .card {
-  transition: transform 160ms ease;
-}
-
 .card-image {
   width: 60px;
   min-width: 60px;
   height: 90px;
   object-fit: cover;
   background: #1f2937;
+  cursor: zoom-in;
 }
 
 .card-body {
@@ -259,17 +251,9 @@ button.ghost {
 }
 
 .card.dragging {
-  opacity: 0.45;
+  opacity: 0.65;
   border-color: rgba(56, 189, 248, 0.6);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.45);
-  position: fixed;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.card.drag-placeholder {
-  border: 1px dashed rgba(148, 163, 184, 0.4);
-  background: rgba(15, 23, 42, 0.35);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.35);
 }
 
 .card-actions {
@@ -554,6 +538,18 @@ button.ghost {
   flex: 1;
   min-height: 0;
   margin-top: 0;
+}
+
+.image-modal {
+  max-width: 520px;
+  padding-top: 2.5rem;
+}
+
+.image-modal img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  background: #0f172a;
 }
 
 @media (max-width: 700px) {
