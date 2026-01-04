@@ -1,11 +1,11 @@
-# drivemap
+# shovo
 
 This repository now contains two utilities:
 
 - `drivemap`: a drive blocks map display utility (original bash script).
-- `webapp/`: a mobile-friendly shared watchlist web app using Flask.
+- `webapp/`: the Shovo shared watchlist web app using Flask.
 
-## Shared watchlist web app
+## Shovo shared watchlist web app
 
 A lightweight web app that lets anyone with the URL create a shared movie/show list. It
 uses IMDB search results (including thumbnails) and fetches IMDB ratings.
