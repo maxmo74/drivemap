@@ -11,6 +11,8 @@ const cardTemplate = document.getElementById('result-card-template');
 let activeTab = 'unwatched';
 let searchTimer;
 let activeSearchController;
+let lastSearchQuery = '';
+let lastSearchResults = [];
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -86,13 +88,29 @@ const renderList = (items) => {
   });
 };
 
+const filterCachedResults = (query) => {
+  const normalized = query.toLowerCase();
+  return lastSearchResults.filter((item) =>
+    item.title.toLowerCase().includes(normalized)
+  );
+};
+
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
   if (query.length < 2) {
     showStatus(searchResults, 'Type at least 2 characters to search.');
     return;
   }
-  showStatus(searchResults, 'Searching...');
+  if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
+    const cached = filterCachedResults(query);
+    if (cached.length) {
+      renderSearchResults(cached);
+    } else {
+      showStatus(searchResults, 'Searching...');
+    }
+  } else {
+    showStatus(searchResults, 'Searching...');
+  }
   if (activeSearchController) {
     activeSearchController.abort();
   }
@@ -106,7 +124,9 @@ const fetchSearch = async () => {
       return;
     }
     const data = await response.json();
-    renderSearchResults(data.results || []);
+    lastSearchQuery = query;
+    lastSearchResults = data.results || [];
+    renderSearchResults(lastSearchResults);
   } catch (error) {
     if (error.name !== 'AbortError') {
       showStatus(searchResults, 'Search failed. Try again later.');
