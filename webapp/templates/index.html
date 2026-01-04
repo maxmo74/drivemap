@@ -3,26 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Shared Watchlist</title>
+    <title>Shovo</title>
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
     <main>
-      <header>
-        <div>
-          <h1>Shared Watchlist</h1>
-          <p class="subtitle">Share this URL to collaborate with friends. No accounts needed.</p>
-        </div>
-        <div class="badge-row">
-          <div class="room-badge">
-            <span>Room</span>
-            <strong id="room-id">{{ room }}</strong>
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-row">
+            <h1>Shovo</h1>
+            <div class="room-tag">
+              <span>List ID</span>
+              <strong id="room-id">{{ room }}</strong>
+            </div>
           </div>
-          <div class="version-badge">
-            <span>Version</span>
-            <strong id="app-version">{{ app_version }}</strong>
-          </div>
+          <p class="subtitle">Share this list with friends. No accounts needed.</p>
         </div>
+        <details class="menu">
+          <summary aria-label="Open menu">
+            <span></span>
+            <span></span>
+            <span></span>
+          </summary>
+          <div class="menu-panel">
+            <div class="menu-item">
+              <span>Version</span>
+              <strong id="app-version">{{ app_version }}</strong>
+            </div>
+            <button class="menu-action" id="change-list-id" type="button">Change List ID</button>
+          </div>
+        </details>
       </header>
 
       <section class="search-panel">
