@@ -18,7 +18,9 @@ CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.2.4"
+APP_VERSION = "1.2.5"
+MAX_RESULTS = 10
+IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
 
 app = Flask(__name__)
@@ -217,6 +219,41 @@ def fetch_suggestions(query: str, user_agent: str) -> list[SearchResult]:
     return results
 
 
+def fetch_title_by_id(title_id: str, user_agent: str) -> SearchResult | None:
+    if not title_id:
+        return None
+    first = title_id[0].lower()
+    url = IMDB_SUGGESTION_URL.format(first=first, query=requests.utils.quote(title_id))
+    headers = {"User-Agent": user_agent}
+    response = requests.get(url, headers=headers, timeout=10)
+    response.raise_for_status()
+    payload = response.json()
+    items: Iterable[dict[str, Any]] = payload.get("d", [])
+    for item in items:
+        if item.get("id") == title_id:
+            return parse_suggestion_item(item, user_agent)
+    return None
+
+
+def fetch_trending(user_agent: str) -> list[SearchResult]:
+    headers = {"User-Agent": user_agent}
+    response = requests.get(IMDB_TRENDING_URL, headers=headers, timeout=10)
+    response.raise_for_status()
+    ids = re.findall(r"/title/(tt\d+)/", response.text)
+    seen: set[str] = set()
+    results: list[SearchResult] = []
+    for title_id in ids:
+        if title_id in seen:
+            continue
+        seen.add(title_id)
+        result = fetch_title_by_id(title_id, user_agent)
+        if result:
+            results.append(result)
+        if len(results) >= MAX_RESULTS:
+            break
+    return results
+
+
 def _request_user_agent() -> str:
     return request.headers.get("User-Agent") or DEFAULT_USER_AGENT
 
@@ -283,7 +320,17 @@ def api_search() -> Any:
         results = fetch_suggestions(query, user_agent)
     except requests.RequestException as exc:
         return jsonify({"error": "imdb_fetch_failed", "detail": str(exc)}), 502
-    return jsonify({"results": [serialize_result(result) for result in results[:8]]})
+    return jsonify({"results": [serialize_result(result) for result in results[:MAX_RESULTS]]})
+
+
+@app.route("/api/trending")
+def api_trending() -> Any:
+    user_agent = _request_user_agent()
+    try:
+        results = fetch_trending(user_agent)
+    except requests.RequestException as exc:
+        return jsonify({"error": "imdb_fetch_failed", "detail": str(exc)}), 502
+    return jsonify({"results": [serialize_result(result) for result in results]})
 
 
 @app.route("/api/list", methods=["GET"])

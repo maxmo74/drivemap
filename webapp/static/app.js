@@ -4,12 +4,16 @@ const searchButton = document.getElementById('search-button');
 const searchResults = document.getElementById('search-results');
 const searchModal = document.getElementById('search-modal');
 const searchModalClose = document.getElementById('search-modal-close');
+const trendingResults = document.getElementById('trending-results');
+const trendingModal = document.getElementById('trending-modal');
+const trendingModalClose = document.getElementById('trending-modal-close');
 const listResults = document.getElementById('list-results');
 const refreshButton = document.getElementById('refresh-button');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
+const trendingButton = document.getElementById('open-trending');
 const menu = document.querySelector('.menu');
 const roomTagButton = document.getElementById('room-tag-button');
 const renameModal = document.getElementById('rename-modal');
@@ -18,6 +22,7 @@ const renameModalCancel = document.getElementById('rename-modal-cancel');
 const renameModalConfirm = document.getElementById('rename-modal-confirm');
 const renameModalClose = document.getElementById('rename-modal-close');
 
+const MAX_RESULTS = 10;
 let activeTab = 'unwatched';
 let searchTimer;
 let activeSearchController;
@@ -50,6 +55,22 @@ const closeSearchModal = () => {
   }
   searchModal.classList.remove('is-visible');
   searchModal.setAttribute('aria-hidden', 'true');
+};
+
+const openTrendingModal = () => {
+  if (!trendingModal) {
+    return;
+  }
+  trendingModal.classList.add('is-visible');
+  trendingModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeTrendingModal = () => {
+  if (!trendingModal) {
+    return;
+  }
+  trendingModal.classList.remove('is-visible');
+  trendingModal.setAttribute('aria-hidden', 'true');
 };
 
 const sanitizeRoom = (value) =>
@@ -119,13 +140,27 @@ const buildCard = (item, mode) => {
 
 const renderSearchResults = (items) => {
   searchResults.innerHTML = '';
-  if (!items.length) {
+  const limited = items.slice(0, MAX_RESULTS);
+  if (!limited.length) {
     return;
   }
   openSearchModal();
-  items.forEach((item) => {
+  limited.forEach((item) => {
     const card = buildCard(item, 'search');
     searchResults.appendChild(card);
+  });
+};
+
+const renderTrendingResults = (items) => {
+  trendingResults.innerHTML = '';
+  const limited = items.slice(0, MAX_RESULTS);
+  if (!limited.length) {
+    return;
+  }
+  openTrendingModal();
+  limited.forEach((item) => {
+    const card = buildCard(item, 'search');
+    trendingResults.appendChild(card);
   });
 };
 
@@ -232,6 +267,29 @@ const loadList = async () => {
   }
   const data = await response.json();
   renderList(data.items || []);
+};
+
+const fetchTrending = async () => {
+  if (!trendingResults) {
+    return;
+  }
+  openTrendingModal();
+  showStatus(trendingResults, 'Loading trending titles...');
+  try {
+    const response = await fetch('/api/trending');
+    if (!response.ok) {
+      showStatus(trendingResults, 'Unable to load trending titles.');
+      return;
+    }
+    const data = await response.json();
+    if (!data.results || !data.results.length) {
+      showStatus(trendingResults, 'No trending titles found.');
+      return;
+    }
+    renderTrendingResults(data.results);
+  } catch (error) {
+    showStatus(trendingResults, 'Unable to load trending titles.');
+  }
 };
 
 const addToList = async (item, watched, cardNode) => {
@@ -458,9 +516,18 @@ searchModal?.addEventListener('click', (event) => {
     closeSearchModal();
   }
 });
+trendingModalClose?.addEventListener('click', closeTrendingModal);
+trendingModal?.addEventListener('click', (event) => {
+  if (event.target === trendingModal) {
+    closeTrendingModal();
+  }
+});
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && searchModal?.classList.contains('is-visible')) {
     closeSearchModal();
+  }
+  if (event.key === 'Escape' && trendingModal?.classList.contains('is-visible')) {
+    closeTrendingModal();
   }
 });
 refreshButton.addEventListener('click', loadList);
@@ -490,6 +557,12 @@ if (changeListButton) {
     openRenameModal();
   });
   roomTagButton?.addEventListener('click', openRenameModal);
+  trendingButton?.addEventListener('click', () => {
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    fetchTrending();
+  });
 
   renameModalCancel?.addEventListener('click', closeRenameModal);
   renameModalClose?.addEventListener('click', closeRenameModal);
