@@ -17,7 +17,7 @@ DB_PATH = os.path.join(APP_ROOT, "data.sqlite3")
 CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
-USER_AGENT = "drivemap-movielist/1.0 (+https://example.com)"
+DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
 APP_VERSION = "1.2.0"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
 
@@ -130,8 +130,8 @@ def _rating_cache_set(conn: sqlite3.Connection, title_id: str, rating: str | Non
     )
 
 
-def _fetch_rating(title_id: str) -> str | None:
-    headers = {"User-Agent": USER_AGENT}
+def _fetch_rating(title_id: str, user_agent: str) -> str | None:
+    headers = {"User-Agent": user_agent}
     response = requests.get(IMDB_TITLE_URL.format(title_id=title_id), headers=headers, timeout=10)
     response.raise_for_status()
     match = re.search(r'<script type="application/ld\+json">(.*?)</script>', response.text, re.S)
@@ -147,13 +147,13 @@ def _fetch_rating(title_id: str) -> str | None:
     return str(rating)
 
 
-def get_rating(title_id: str) -> str | None:
+def get_rating(title_id: str, user_agent: str) -> str | None:
     with _get_db() as conn:
         cached = _rating_cache_get(conn, title_id)
         if cached is not None:
             return cached
         try:
-            rating = _fetch_rating(title_id)
+            rating = _fetch_rating(title_id, user_agent)
         except requests.RequestException:
             rating = None
         _rating_cache_set(conn, title_id, rating)
@@ -161,7 +161,7 @@ def get_rating(title_id: str) -> str | None:
         return rating
 
 
-def parse_suggestion_item(item: dict[str, Any]) -> SearchResult | None:
+def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult | None:
     title_id = item.get("id")
     if not title_id:
         return None
@@ -178,11 +178,11 @@ def parse_suggestion_item(item: dict[str, Any]) -> SearchResult | None:
         year=str(item.get("y")) if item.get("y") else None,
         type_label=type_label,
         image=item.get("i", {}).get("imageUrl"),
-        rating=get_rating(title_id),
+        rating=get_rating(title_id, user_agent),
     )
 
 
-def fetch_suggestions(query: str) -> list[SearchResult]:
+def fetch_suggestions(query: str, user_agent: str) -> list[SearchResult]:
     if not query:
         return []
     safe_query = query.strip().lower()
@@ -190,17 +190,21 @@ def fetch_suggestions(query: str) -> list[SearchResult]:
         return []
     first = safe_query[0]
     url = IMDB_SUGGESTION_URL.format(first=first, query=requests.utils.quote(safe_query))
-    headers = {"User-Agent": USER_AGENT}
+    headers = {"User-Agent": user_agent}
     response = requests.get(url, headers=headers, timeout=10)
     response.raise_for_status()
     payload = response.json()
     items: Iterable[dict[str, Any]] = payload.get("d", [])
     results: list[SearchResult] = []
     for item in items:
-        parsed = parse_suggestion_item(item)
+        parsed = parse_suggestion_item(item, user_agent)
         if parsed:
             results.append(parsed)
     return results
+
+
+def _request_user_agent() -> str:
+    return request.headers.get("User-Agent") or DEFAULT_USER_AGENT
 
 
 def serialize_result(result: SearchResult) -> dict[str, Any]:
@@ -253,8 +257,9 @@ def room(room: str) -> Any:
 @app.route("/api/search")
 def api_search() -> Any:
     query = request.args.get("q", "")
+    user_agent = _request_user_agent()
     try:
-        results = fetch_suggestions(query)
+        results = fetch_suggestions(query, user_agent)
     except requests.RequestException as exc:
         return jsonify({"error": "imdb_fetch_failed", "detail": str(exc)}), 502
     return jsonify({"results": [serialize_result(result) for result in results[:8]]})
