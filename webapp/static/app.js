@@ -10,6 +10,7 @@ const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
 const menu = document.querySelector('.menu');
+const roomTagButton = document.getElementById('room-tag-button');
 const renameModal = document.getElementById('rename-modal');
 const renameModalInput = document.getElementById('rename-modal-input');
 const renameModalCancel = document.getElementById('rename-modal-cancel');
@@ -182,6 +183,10 @@ const fetchSearch = async () => {
 
 const debounceSearch = () => {
   clearTimeout(searchTimer);
+  const query = searchInput.value.trim();
+  if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
+    renderSearchResults(filterCachedResults(query));
+  }
   searchTimer = setTimeout(fetchSearch, 1000);
 };
 
@@ -461,6 +466,7 @@ if (changeListButton) {
     }
     openRenameModal();
   });
+  roomTagButton?.addEventListener('click', openRenameModal);
 
   renameModalCancel?.addEventListener('click', closeRenameModal);
   renameModalClose?.addEventListener('click', closeRenameModal);
