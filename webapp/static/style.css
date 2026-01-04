@@ -211,6 +211,31 @@ button.ghost {
   color: #94a3b8;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.pagination-button {
+  background: rgba(56, 189, 248, 0.2);
+  color: #e2e8f0;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  min-width: 80px;
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-status {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
 .list-grid.is-reordering .card {
   transition: transform 160ms ease;
 }
