@@ -124,6 +124,8 @@ const buildCard = (item, mode) => {
   const watchedButton = card.querySelector('.card-action.secondary');
   const removeButton = card.querySelector('.card-action.danger');
   const dragHandle = card.querySelector('.card-drag-handle');
+  const moveUpButton = card.querySelector('.card-action.move-up');
+  const moveDownButton = card.querySelector('.card-action.move-down');
 
   article.dataset.titleId = item.title_id;
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
@@ -163,6 +165,8 @@ const buildCard = (item, mode) => {
     watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
+    moveUpButton.remove();
+    moveDownButton.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
@@ -387,39 +391,10 @@ const onTouchDragMove = (event) => {
     draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
     return;
   }
-  const cards = Array.from(listResults.querySelectorAll('.card'));
-  const positions = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
-  const rect = targetCard.getBoundingClientRect();
-  const insertBefore = event.clientY < rect.top + rect.height / 2;
-  if (dragPlaceholder) {
-    listResults.insertBefore(
-      dragPlaceholder,
-      insertBefore ? targetCard : targetCard.nextSibling
-    );
-  }
-  cards.forEach((card) => {
-    if (card === draggingCard) {
-      return;
-    }
-    const oldRect = positions.get(card);
-    const newRect = card.getBoundingClientRect();
-    const deltaY = oldRect.top - newRect.top;
-    if (Math.abs(deltaY) > 0.5) {
-      card.style.transform = `translateY(${deltaY}px)`;
-    }
-  });
-  if (!isReordering) {
-    isReordering = true;
-    listResults.classList.add('is-reordering');
-  }
-  requestAnimationFrame(() => {
-    cards.forEach((card) => {
-      if (card === draggingCard) {
-        return;
-      }
-      card.style.transform = '';
-    });
-  });
+  dragSource = event.currentTarget;
+  dragSource.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', dragSource.dataset.titleId || '');
 };
 
 const onTouchDragEnd = async () => {

@@ -156,9 +156,8 @@ button.ghost {
   grid-template-columns: 1fr;
 }
 
-.list-grid.is-dragging {
-  touch-action: none;
-  user-select: none;
+.list-grid {
+  grid-template-columns: 1fr;
 }
 
 .list-grid.is-reordering .card {
@@ -305,6 +304,13 @@ button.ghost {
   background: rgba(248, 113, 113, 0.2);
   color: #fca5a5;
   border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.card-action.move-up,
+.card-action.move-down {
+  background: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
 }
 
 .list-header {
