@@ -17,6 +17,7 @@ let draggingCard = null;
 let draggingPointerId = null;
 let draggingStartY = 0;
 let draggingOffsetY = 0;
+let isReordering = false;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -205,21 +206,51 @@ const onDragMove = (event) => {
   if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
     return;
   }
+  const cards = Array.from(listResults.querySelectorAll('.card'));
+  const positions = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
   const rect = targetCard.getBoundingClientRect();
   const insertBefore = event.clientY < rect.top + rect.height / 2;
   listResults.insertBefore(draggingCard, insertBefore ? targetCard : targetCard.nextSibling);
+  cards.forEach((card) => {
+    if (card === draggingCard) {
+      return;
+    }
+    const oldRect = positions.get(card);
+    const newRect = card.getBoundingClientRect();
+    const deltaY = oldRect.top - newRect.top;
+    if (Math.abs(deltaY) > 0.5) {
+      card.style.transform = `translateY(${deltaY}px)`;
+    }
+  });
+  if (!isReordering) {
+    isReordering = true;
+    listResults.classList.add('is-reordering');
+  }
+  requestAnimationFrame(() => {
+    cards.forEach((card) => {
+      if (card === draggingCard) {
+        return;
+      }
+      card.style.transform = '';
+    });
+  });
 };
 
 const onDragEnd = async () => {
   if (!draggingCard) {
     return;
   }
+  listResults.querySelectorAll('.card').forEach((card) => {
+    card.style.transform = '';
+  });
   draggingCard.style.transform = '';
   draggingCard.classList.remove('dragging');
   draggingCard = null;
   draggingPointerId = null;
   draggingStartY = 0;
   draggingOffsetY = 0;
+  listResults.classList.remove('is-reordering');
+  isReordering = false;
   await syncOrder();
 };
 

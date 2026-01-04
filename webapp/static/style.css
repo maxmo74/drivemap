@@ -131,6 +131,10 @@ button.ghost {
   overflow: hidden;
 }
 
+.list-grid.is-reordering .card {
+  transition: transform 160ms ease;
+}
+
 .card-image {
   width: 110px;
   min-width: 110px;
