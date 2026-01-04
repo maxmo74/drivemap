@@ -13,6 +13,8 @@ let searchTimer;
 let activeSearchController;
 let lastSearchQuery = '';
 let lastSearchResults = [];
+let draggingCard = null;
+let draggingPointerId = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -28,7 +30,9 @@ const buildCard = (item, mode) => {
   const addButton = card.querySelector('.card-action.primary');
   const watchedButton = card.querySelector('.card-action.secondary');
   const removeButton = card.querySelector('.card-action.danger');
+  const dragHandle = card.querySelector('.card-drag-handle');
 
+  article.dataset.titleId = item.title_id;
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
   image.alt = `${item.title} poster`;
   title.textContent = item.title;
@@ -46,6 +50,7 @@ const buildCard = (item, mode) => {
     addButton.textContent = 'Add';
     watchedButton.textContent = 'Add as watched';
     removeButton.remove();
+    dragHandle.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
@@ -54,6 +59,9 @@ const buildCard = (item, mode) => {
     removeButton.textContent = 'Remove';
     addButton.addEventListener('click', () => toggleWatched(item));
     removeButton.addEventListener('click', () => removeFromList(item));
+    if (activeTab !== 'unwatched') {
+      dragHandle.remove();
+    }
   }
 
   return card;
@@ -86,6 +94,14 @@ const renderList = (items) => {
     const card = buildCard(item, 'list');
     listResults.appendChild(card);
   });
+  attachDragHandlers();
+};
+
+const filterCachedResults = (query) => {
+  const normalized = query.toLowerCase();
+  return lastSearchResults.filter((item) =>
+    item.title.toLowerCase().includes(normalized)
+  );
 };
 
 const filterCachedResults = (query) => {
@@ -164,6 +180,85 @@ const addToList = async (item, watched, cardNode) => {
     cardNode.querySelector('.card-action.primary').textContent = 'Added';
   }
   await loadList();
+};
+
+const syncOrder = async () => {
+  const order = Array.from(listResults.querySelectorAll('.card')).map(
+    (card) => card.dataset.titleId
+  );
+  if (!order.length) {
+    return;
+  }
+  const response = await fetch('/api/list/order', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ room, order })
+  });
+  if (!response.ok) {
+    alert('Failed to save order.');
+  }
+};
+
+const onDragMove = (event) => {
+  if (!draggingCard) {
+    return;
+  }
+  const target = document.elementFromPoint(event.clientX, event.clientY);
+  const targetCard = target ? target.closest('.card') : null;
+  if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
+    return;
+  }
+  const rect = targetCard.getBoundingClientRect();
+  const insertBefore = event.clientY < rect.top + rect.height / 2;
+  listResults.insertBefore(draggingCard, insertBefore ? targetCard : targetCard.nextSibling);
+};
+
+const onDragEnd = async () => {
+  if (!draggingCard) {
+    return;
+  }
+  draggingCard.classList.remove('dragging');
+  draggingCard = null;
+  draggingPointerId = null;
+  await syncOrder();
+};
+
+const attachDragHandlers = () => {
+  if (activeTab !== 'unwatched') {
+    return;
+  }
+  listResults.querySelectorAll('.card-drag-handle').forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      const card = event.currentTarget.closest('.card');
+      if (!card) {
+        return;
+      }
+      draggingCard = card;
+      draggingPointerId = event.pointerId;
+      card.classList.add('dragging');
+      event.currentTarget.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener('pointermove', (event) => {
+      if (draggingPointerId !== event.pointerId) {
+        return;
+      }
+      onDragMove(event);
+    });
+    handle.addEventListener('pointerup', (event) => {
+      if (draggingPointerId !== event.pointerId) {
+        return;
+      }
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      onDragEnd();
+    });
+    handle.addEventListener('pointercancel', (event) => {
+      if (draggingPointerId !== event.pointerId) {
+        return;
+      }
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      onDragEnd();
+    });
+  });
 };
 
 const toggleWatched = async (item) => {

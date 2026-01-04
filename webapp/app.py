@@ -53,6 +53,7 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
             image TEXT,
             rating TEXT,
             added_at INTEGER NOT NULL,
+            position INTEGER,
             PRIMARY KEY (room, title_id)
         );
 
@@ -67,6 +68,42 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
     if "watched" not in columns:
         conn.execute("ALTER TABLE lists ADD COLUMN watched INTEGER NOT NULL DEFAULT 0")
     conn.execute("UPDATE lists SET watched = 0 WHERE watched IS NULL")
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(lists)")}
+    if "position" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN position INTEGER")
+        _backfill_positions(conn, force=True)
+    else:
+        conn.execute("UPDATE lists SET position = NULL WHERE position = 0")
+        _backfill_positions(conn)
+
+
+def _backfill_positions(conn: sqlite3.Connection, force: bool = False) -> None:
+    rooms = [row["room"] for row in conn.execute("SELECT DISTINCT room FROM lists")]
+    for room in rooms:
+        if force:
+            rows = conn.execute(
+                "SELECT title_id FROM lists WHERE room = ? ORDER BY added_at ASC",
+                (room,),
+            ).fetchall()
+            for index, row in enumerate(rows, start=1):
+                conn.execute(
+                    "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
+                    (index, room, row["title_id"]),
+                )
+            continue
+        max_position = conn.execute(
+            "SELECT COALESCE(MAX(position), 0) FROM lists WHERE room = ? AND position IS NOT NULL",
+            (room,),
+        ).fetchone()[0]
+        rows = conn.execute(
+            "SELECT title_id FROM lists WHERE room = ? AND position IS NULL ORDER BY added_at ASC",
+            (room,),
+        ).fetchall()
+        for offset, row in enumerate(rows, start=1):
+            conn.execute(
+                "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
+                (max_position + offset, room, row["title_id"]),
+            )
 
 
 def init_db() -> None:
@@ -232,8 +269,9 @@ def api_list() -> Any:
     watched_flag = 1 if status == "watched" else 0
     with _get_db() as conn:
         _migrate_db(conn)
+        order_by = "position ASC, added_at DESC" if watched_flag == 0 else "added_at DESC"
         rows = conn.execute(
-            "SELECT * FROM lists WHERE room = ? AND watched = ? ORDER BY added_at DESC",
+            f"SELECT * FROM lists WHERE room = ? AND watched = ? ORDER BY {order_by}",
             (room, watched_flag),
         ).fetchall()
     return jsonify({"items": [dict(row) for row in rows]})
@@ -254,6 +292,10 @@ def api_add() -> Any:
     watched = _parse_watched(data.get("watched", 0))
     with _get_db() as conn:
         _migrate_db(conn)
+        next_position = conn.execute(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM lists WHERE room = ?",
+            (room,),
+        ).fetchone()[0]
         conn.execute(
             "REPLACE INTO lists (room, title_id, title, year, type_label, image, rating, added_at, watched) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
@@ -268,6 +310,52 @@ def api_add() -> Any:
                 watched,
             ),
         )
+        conn.execute(
+            "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
+            (next_position, room, title_id),
+        )
+        conn.commit()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/list", methods=["PATCH"])
+def api_update() -> Any:
+    if not request.is_json:
+        return jsonify({"error": "invalid_payload"}), 400
+    room = _room_from_request()
+    if not room:
+        return jsonify({"error": "missing_room"}), 400
+    title_id = request.json.get("title_id")
+    watched = _parse_watched(request.json.get("watched"))
+    if not title_id:
+        return jsonify({"error": "missing_title_id"}), 400
+    with _get_db() as conn:
+        _migrate_db(conn)
+        conn.execute(
+            "UPDATE lists SET watched = ? WHERE room = ? AND title_id = ?",
+            (watched, room, title_id),
+        )
+        conn.commit()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/list/order", methods=["PATCH"])
+def api_order() -> Any:
+    if not request.is_json:
+        return jsonify({"error": "invalid_payload"}), 400
+    room = _room_from_request()
+    if not room:
+        return jsonify({"error": "missing_room"}), 400
+    order = request.json.get("order")
+    if not isinstance(order, list) or not order:
+        return jsonify({"error": "invalid_order"}), 400
+    with _get_db() as conn:
+        _migrate_db(conn)
+        for index, title_id in enumerate(order, start=1):
+            conn.execute(
+                "UPDATE lists SET position = ? WHERE room = ? AND title_id = ?",
+                (index, room, title_id),
+            )
         conn.commit()
     return jsonify({"status": "ok"})
 

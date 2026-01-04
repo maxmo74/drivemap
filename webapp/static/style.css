@@ -166,6 +166,22 @@ button.ghost {
   align-items: baseline;
 }
 
+.card-drag-handle {
+  background: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 0.5rem;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.9rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.card.dragging {
+  opacity: 0.7;
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
 .card-actions {
   display: flex;
   gap: 0.5rem;
