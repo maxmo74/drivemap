@@ -13,9 +13,15 @@
           <h1>Shared Watchlist</h1>
           <p class="subtitle">Share this URL to collaborate with friends. No accounts needed.</p>
         </div>
-        <div class="room-badge">
-          <span>Room</span>
-          <strong id="room-id">{{ room }}</strong>
+        <div class="badge-row">
+          <div class="room-badge">
+            <span>Room</span>
+            <strong id="room-id">{{ room }}</strong>
+          </div>
+          <div class="version-badge">
+            <span>Version</span>
+            <strong id="app-version">{{ app_version }}</strong>
+          </div>
         </div>
       </header>
 
@@ -30,7 +36,10 @@
 
       <section class="list-panel">
         <div class="list-header">
-          <h2>Your list</h2>
+          <div class="tabs" role="tablist">
+            <button id="tab-watchlist" class="tab active" role="tab">Watchlist</button>
+            <button id="tab-watched" class="tab" role="tab">Watched</button>
+          </div>
           <button id="refresh-button" class="ghost">Refresh</button>
         </div>
         <div id="list-results" class="list-grid"></div>
@@ -41,10 +50,17 @@
       <article class="card">
         <img class="card-image" alt="" />
         <div class="card-body">
-          <h3 class="card-title"></h3>
+          <div class="card-row">
+            <h3 class="card-title"></h3>
+            <p class="card-rating"></p>
+            <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
+          </div>
           <p class="card-meta"></p>
-          <p class="card-rating"></p>
-          <button class="card-action">Add</button>
+          <div class="card-actions">
+            <button class="card-action primary">Add</button>
+            <button class="card-action secondary">Watched</button>
+            <button class="card-action danger">Remove</button>
+          </div>
         </div>
       </article>
     </template>
