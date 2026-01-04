@@ -10,6 +10,11 @@ const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
 const menu = document.querySelector('.menu');
+const renameModal = document.getElementById('rename-modal');
+const renameModalInput = document.getElementById('rename-modal-input');
+const renameModalCancel = document.getElementById('rename-modal-cancel');
+const renameModalConfirm = document.getElementById('rename-modal-confirm');
+const renameModalClose = document.getElementById('rename-modal-close');
 
 let activeTab = 'unwatched';
 let searchTimer;
@@ -130,8 +135,14 @@ const filterCachedResults = (query) => {
 
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
-  if (query.length < 2) {
+  if (query.length < 3) {
     renderSearchResults([]);
+    lastSearchQuery = '';
+    lastSearchResults = [];
+    if (activeSearchController) {
+      activeSearchController.abort();
+      activeSearchController = null;
+    }
     return;
   }
   if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
@@ -169,7 +180,7 @@ const fetchSearch = async () => {
 
 const debounceSearch = () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(fetchSearch, 200);
+  searchTimer = setTimeout(fetchSearch, 1000);
 };
 
 const updateClearButton = () => {
@@ -240,20 +251,28 @@ const onDragMove = (event) => {
     return;
   }
   event.preventDefault();
-  draggingOffsetY = event.clientY - draggingStartY;
-  draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
   const hoveredCards = document.elementsFromPoint(event.clientX, event.clientY);
   const targetCard = hoveredCards
     .map((node) => node.closest?.('.card'))
     .find((card) => card && card !== draggingCard && card.parentElement === listResults);
   if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
+    draggingOffsetY = event.clientY - draggingStartY;
+    draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
     return;
   }
   const cards = Array.from(listResults.querySelectorAll('.card'));
   const positions = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
   const rect = targetCard.getBoundingClientRect();
   const insertBefore = event.clientY < rect.top + rect.height / 2;
+  const previousTop = draggingCard.getBoundingClientRect().top;
   listResults.insertBefore(draggingCard, insertBefore ? targetCard : targetCard.nextSibling);
+  const nextTop = draggingCard.getBoundingClientRect().top;
+  const topDelta = nextTop - previousTop;
+  if (Math.abs(topDelta) > 0.5) {
+    draggingStartY += topDelta;
+  }
+  draggingOffsetY = event.clientY - draggingStartY;
+  draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
   cards.forEach((card) => {
     if (card === draggingCard) {
       return;
@@ -392,19 +411,64 @@ searchInput.addEventListener('input', debounceSearch);
 searchInput.addEventListener('input', updateClearButton);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
-    fetchSearch();
+    event.preventDefault();
+    debounceSearch();
   }
 });
 clearSearchButton?.addEventListener('click', clearSearch);
 refreshButton.addEventListener('click', loadList);
 if (changeListButton) {
-  changeListButton.addEventListener('click', async () => {
-    const nextRoomInput = window.prompt('Rename List ID', room);
-    if (nextRoomInput === null) {
+  const closeRenameModal = () => {
+    if (!renameModal) {
       return;
     }
-    const nextRoom = sanitizeRoom(nextRoomInput);
+    renameModal.classList.remove('is-visible');
+    renameModal.setAttribute('aria-hidden', 'true');
+  };
+  const openRenameModal = () => {
+    if (!renameModal || !renameModalInput) {
+      return;
+    }
+    renameModalInput.value = room;
+    renameModal.classList.add('is-visible');
+    renameModal.setAttribute('aria-hidden', 'false');
+    renameModalInput.focus();
+    renameModalInput.select();
+  };
+
+  changeListButton.addEventListener('click', () => {
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    openRenameModal();
+  });
+
+  renameModalCancel?.addEventListener('click', closeRenameModal);
+  renameModalClose?.addEventListener('click', closeRenameModal);
+  renameModal?.addEventListener('click', (event) => {
+    if (event.target === renameModal) {
+      closeRenameModal();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && renameModal?.classList.contains('is-visible')) {
+      closeRenameModal();
+    }
+  });
+  renameModalInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      renameModalConfirm?.click();
+    }
+  });
+
+  renameModalConfirm?.addEventListener('click', async () => {
+    if (!renameModalInput) {
+      return;
+    }
+    const nextRoom = sanitizeRoom(renameModalInput.value);
     if (!nextRoom || nextRoom === room) {
+      closeRenameModal();
       return;
     }
     const response = await fetch('/api/list/rename', {
@@ -416,9 +480,6 @@ if (changeListButton) {
       const data = await response.json().catch(() => ({}));
       alert(data.message || 'Unable to rename list.');
       return;
-    }
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
     }
     window.location.href = `/r/${encodeURIComponent(nextRoom)}`;
   });
