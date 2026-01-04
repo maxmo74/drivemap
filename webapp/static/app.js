@@ -1,8 +1,9 @@
 const room = window.APP_ROOM;
 const searchInput = document.getElementById('search-input');
 const searchButton = document.getElementById('search-button');
-const clearSearchButton = document.getElementById('clear-search');
 const searchResults = document.getElementById('search-results');
+const searchModal = document.getElementById('search-modal');
+const searchModalClose = document.getElementById('search-modal-close');
 const listResults = document.getElementById('list-results');
 const refreshButton = document.getElementById('refresh-button');
 const tabWatchlist = document.getElementById('tab-watchlist');
@@ -33,6 +34,22 @@ let dragOriginRect = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
+};
+
+const openSearchModal = () => {
+  if (!searchModal) {
+    return;
+  }
+  searchModal.classList.add('is-visible');
+  searchModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeSearchModal = () => {
+  if (!searchModal) {
+    return;
+  }
+  searchModal.classList.remove('is-visible');
+  searchModal.setAttribute('aria-hidden', 'true');
 };
 
 const sanitizeRoom = (value) =>
@@ -105,6 +122,7 @@ const renderSearchResults = (items) => {
   if (!items.length) {
     return;
   }
+  openSearchModal();
   items.forEach((item) => {
     const card = buildCard(item, 'search');
     searchResults.appendChild(card);
@@ -142,6 +160,7 @@ const fetchSearch = async () => {
     renderSearchResults([]);
     lastSearchQuery = '';
     lastSearchResults = [];
+    closeSearchModal();
     if (activeSearchController) {
       activeSearchController.abort();
       activeSearchController = null;
@@ -153,9 +172,11 @@ const fetchSearch = async () => {
     if (cached.length) {
       renderSearchResults(cached);
     } else {
+      openSearchModal();
       showStatus(searchResults, 'Searching...');
     }
   } else {
+    openSearchModal();
     showStatus(searchResults, 'Searching...');
   }
   if (activeSearchController) {
@@ -167,15 +188,22 @@ const fetchSearch = async () => {
       signal: activeSearchController.signal
     });
     if (!response.ok) {
+      openSearchModal();
       showStatus(searchResults, 'Search failed. Try again later.');
       return;
     }
     const data = await response.json();
     lastSearchQuery = query;
     lastSearchResults = data.results || [];
+    if (!lastSearchResults.length) {
+      openSearchModal();
+      showStatus(searchResults, 'No matches found.');
+      return;
+    }
     renderSearchResults(lastSearchResults);
   } catch (error) {
     if (error.name !== 'AbortError') {
+      openSearchModal();
       showStatus(searchResults, 'Search failed. Try again later.');
     }
   }
@@ -187,26 +215,12 @@ const debounceSearch = () => {
   if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
     renderSearchResults(filterCachedResults(query));
   }
-  searchTimer = setTimeout(fetchSearch, 1000);
-};
-
-const updateClearButton = () => {
-  if (!clearSearchButton) {
+  if (!query) {
+    renderSearchResults([]);
+    closeSearchModal();
     return;
   }
-  clearSearchButton.disabled = searchInput.value.trim().length === 0;
-};
-
-const clearSearch = () => {
-  searchInput.value = '';
-  lastSearchQuery = '';
-  lastSearchResults = [];
-  if (activeSearchController) {
-    activeSearchController.abort();
-    activeSearchController = null;
-  }
-  renderSearchResults([]);
-  updateClearButton();
+  searchTimer = setTimeout(fetchSearch, 1000);
 };
 
 const loadList = async () => {
@@ -432,14 +446,23 @@ const setActiveTab = (nextTab) => {
 
 searchButton.addEventListener('click', fetchSearch);
 searchInput.addEventListener('input', debounceSearch);
-searchInput.addEventListener('input', updateClearButton);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
     debounceSearch();
   }
 });
-clearSearchButton?.addEventListener('click', clearSearch);
+searchModalClose?.addEventListener('click', closeSearchModal);
+searchModal?.addEventListener('click', (event) => {
+  if (event.target === searchModal) {
+    closeSearchModal();
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && searchModal?.classList.contains('is-visible')) {
+    closeSearchModal();
+  }
+});
 refreshButton.addEventListener('click', loadList);
 if (changeListButton) {
   const closeRenameModal = () => {
@@ -515,4 +538,3 @@ tabWatched.addEventListener('click', () => setActiveTab('watched'));
 
 loadList();
 renderSearchResults([]);
-updateClearButton();
