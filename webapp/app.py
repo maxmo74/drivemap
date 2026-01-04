@@ -18,7 +18,7 @@ CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.4"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
 
 app = Flask(__name__)
@@ -172,13 +172,27 @@ def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult
         normalized_type = ""
     if normalized_type not in ALLOWED_TYPE_LABELS:
         return None
+    image_url = item.get("i", {}).get("imageUrl")
     return SearchResult(
         title_id=title_id,
         title=item.get("l") or "Untitled",
         year=str(item.get("y")) if item.get("y") else None,
         type_label=type_label,
-        image=item.get("i", {}).get("imageUrl"),
+        image=_shrink_image_url(image_url),
         rating=get_rating(title_id, user_agent),
+    )
+
+
+def _shrink_image_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    match = re.search(r"\._V1_.*(\.jpg|\.png)$", url)
+    if not match:
+        return url
+    return re.sub(
+        r"\._V1_.*(\.jpg|\.png)$",
+        r"._V1_UX120_CR0,0,120,180_AL_\1",
+        url,
     )
 
 
