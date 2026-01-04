@@ -116,6 +116,8 @@ const buildCard = (item, mode) => {
   const watchedButton = card.querySelector('.card-action.secondary');
   const removeButton = card.querySelector('.card-action.danger');
   const dragHandle = card.querySelector('.card-drag-handle');
+  const moveUpButton = card.querySelector('.card-action.move-up');
+  const moveDownButton = card.querySelector('.card-action.move-down');
 
   article.dataset.titleId = item.title_id;
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
@@ -155,6 +157,8 @@ const buildCard = (item, mode) => {
     watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
+    moveUpButton.remove();
+    moveDownButton.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
