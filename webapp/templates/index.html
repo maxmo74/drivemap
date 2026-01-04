@@ -100,6 +100,37 @@
       </div>
     </div>
 
+    <div class="modal-overlay" id="refresh-confirm-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="modal-header modal-header--compact">
+          <button class="icon-button" id="refresh-confirm-close" type="button" aria-label="Close refresh prompt">
+            ×
+          </button>
+        </div>
+        <p class="modal-subtitle">Refresh Database</p>
+        <p class="modal-body">
+          This will refresh ratings and metadata for this list. Continue?
+        </p>
+        <div class="modal-actions">
+          <button class="ghost" id="refresh-confirm-cancel" type="button">Cancel</button>
+          <button id="refresh-confirm-start" type="button">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="refresh-progress-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="modal-header modal-header--compact">
+          <button class="icon-button" id="refresh-progress-close" type="button" aria-label="Close refresh status">
+            ×
+          </button>
+        </div>
+        <p class="modal-subtitle" id="refresh-progress-title">Refreshing database…</p>
+        <progress id="refresh-progress-bar" value="0" max="100"></progress>
+        <p class="modal-body" id="refresh-progress-text">Preparing refresh…</p>
+      </div>
+    </div>
+
     <div class="modal-overlay" id="trending-modal" aria-hidden="true" role="dialog" aria-modal="true">
       <div class="modal search-modal">
         <div class="modal-header modal-header--compact">

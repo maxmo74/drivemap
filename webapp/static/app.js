@@ -20,6 +20,15 @@ const renameModalInput = document.getElementById('rename-modal-input');
 const renameModalCancel = document.getElementById('rename-modal-cancel');
 const renameModalConfirm = document.getElementById('rename-modal-confirm');
 const renameModalClose = document.getElementById('rename-modal-close');
+const refreshConfirmModal = document.getElementById('refresh-confirm-modal');
+const refreshConfirmCancel = document.getElementById('refresh-confirm-cancel');
+const refreshConfirmStart = document.getElementById('refresh-confirm-start');
+const refreshConfirmClose = document.getElementById('refresh-confirm-close');
+const refreshProgressModal = document.getElementById('refresh-progress-modal');
+const refreshProgressClose = document.getElementById('refresh-progress-close');
+const refreshProgressTitle = document.getElementById('refresh-progress-title');
+const refreshProgressBar = document.getElementById('refresh-progress-bar');
+const refreshProgressText = document.getElementById('refresh-progress-text');
 const imageModal = document.getElementById('image-modal');
 const imageModalClose = document.getElementById('image-modal-close');
 const imageModalImage = document.getElementById('image-modal-image');
@@ -46,6 +55,8 @@ const pageState = { unwatched: 1, watched: 1 };
 const totalPages = { unwatched: 1, watched: 1 };
 const pendingDetailRequests = new Set();
 const detailCache = new Map();
+let refreshPollingTimer;
+let refreshOwner = false;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -96,6 +107,38 @@ const closeSearchModal = () => {
   }
   searchModal.classList.remove('is-visible');
   searchModal.setAttribute('aria-hidden', 'true');
+};
+
+const openRefreshConfirmModal = () => {
+  if (!refreshConfirmModal) {
+    return;
+  }
+  refreshConfirmModal.classList.add('is-visible');
+  refreshConfirmModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeRefreshConfirmModal = () => {
+  if (!refreshConfirmModal) {
+    return;
+  }
+  refreshConfirmModal.classList.remove('is-visible');
+  refreshConfirmModal.setAttribute('aria-hidden', 'true');
+};
+
+const openRefreshProgressModal = () => {
+  if (!refreshProgressModal) {
+    return;
+  }
+  refreshProgressModal.classList.add('is-visible');
+  refreshProgressModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeRefreshProgressModal = () => {
+  if (!refreshProgressModal) {
+    return;
+  }
+  refreshProgressModal.classList.remove('is-visible');
+  refreshProgressModal.setAttribute('aria-hidden', 'true');
 };
 
 const openTrendingModal = () => {
@@ -296,6 +339,58 @@ const requestDetails = async (item, article) => {
   }
 };
 
+const updateRefreshProgress = (state) => {
+  if (!refreshProgressBar || !refreshProgressText || !refreshProgressTitle) {
+    return;
+  }
+  const total = Number(state.total || 0);
+  const processed = Number(state.processed || 0);
+  const percent = total ? Math.round((processed / total) * 100) : 0;
+  refreshProgressBar.max = 100;
+  refreshProgressBar.value = percent;
+  refreshProgressText.textContent = total
+    ? `${processed} of ${total} items refreshed`
+    : 'Preparing refresh…';
+  if (!state.refreshing) {
+    refreshProgressTitle.textContent = 'Refresh complete';
+    refreshProgressText.textContent = total
+      ? `${processed} of ${total} items refreshed`
+      : 'Refresh completed.';
+  } else {
+    refreshProgressTitle.textContent = refreshOwner
+      ? 'Refreshing database…'
+      : 'Database refresh in progress…';
+  }
+};
+
+const pollRefreshStatus = async () => {
+  try {
+    const response = await fetch(`/api/refresh/status?room=${encodeURIComponent(room)}`);
+    if (!response.ok) {
+      return;
+    }
+    const state = await response.json();
+    if (state.refreshing) {
+      openRefreshProgressModal();
+      updateRefreshProgress(state);
+    } else if (refreshProgressModal?.classList.contains('is-visible')) {
+      updateRefreshProgress(state);
+      setTimeout(closeRefreshProgressModal, 800);
+      refreshOwner = false;
+    }
+  } catch (error) {
+    // no-op
+  }
+};
+
+const startRefreshPolling = () => {
+  if (refreshPollingTimer) {
+    clearInterval(refreshPollingTimer);
+  }
+  refreshPollingTimer = setInterval(pollRefreshStatus, 1000);
+  pollRefreshStatus();
+};
+
 const renderSearchResults = (items) => {
   searchResults.innerHTML = '';
   const limited = items.slice(0, MAX_RESULTS);
@@ -449,6 +544,7 @@ const loadList = async () => {
   if (listPagination) {
     listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
   }
+  startRefreshPolling();
 };
 
 const fetchTrending = async () => {
@@ -711,7 +807,7 @@ imageModal?.addEventListener('click', (event) => {
     closeImageModal();
   }
 });
-if (changeListButton) {
+  if (changeListButton) {
   const closeRenameModal = () => {
     if (!renameModal) {
       return;
@@ -747,20 +843,7 @@ if (changeListButton) {
     if (menu?.hasAttribute('open')) {
       menu.removeAttribute('open');
     }
-    if (!confirm('Refresh metadata and scores for this list?')) {
-      return;
-    }
-    const response = await fetch('/api/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room })
-    });
-    if (!response.ok) {
-      alert('Unable to refresh database.');
-      return;
-    }
-    detailCache.clear();
-    await loadList();
+    openRefreshConfirmModal();
   });
 
   renameModalCancel?.addEventListener('click', closeRenameModal);
@@ -804,6 +887,55 @@ if (changeListButton) {
     window.location.href = `/r/${encodeURIComponent(nextRoom)}`;
   });
 }
+
+refreshConfirmCancel?.addEventListener('click', closeRefreshConfirmModal);
+refreshConfirmClose?.addEventListener('click', closeRefreshConfirmModal);
+refreshConfirmModal?.addEventListener('click', (event) => {
+  if (event.target === refreshConfirmModal) {
+    closeRefreshConfirmModal();
+  }
+});
+refreshConfirmStart?.addEventListener('click', async () => {
+  closeRefreshConfirmModal();
+  refreshOwner = true;
+  openRefreshProgressModal();
+  updateRefreshProgress({ refreshing: true, processed: 0, total: 0 });
+  try {
+    const response = await fetch('/api/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room })
+    });
+    if (!response.ok) {
+      refreshOwner = false;
+      closeRefreshProgressModal();
+      if (response.status === 409) {
+        alert('A database refresh is already in progress.');
+        startRefreshPolling();
+        return;
+      }
+      alert('Unable to refresh database.');
+      return;
+    }
+    detailCache.clear();
+    startRefreshPolling();
+  } catch (error) {
+    refreshOwner = false;
+    closeRefreshProgressModal();
+    alert('Unable to refresh database.');
+  }
+});
+refreshProgressClose?.addEventListener('click', () => {
+  if (refreshOwner) {
+    return;
+  }
+  closeRefreshProgressModal();
+});
+refreshProgressModal?.addEventListener('click', (event) => {
+  if (event.target === refreshProgressModal && !refreshOwner) {
+    closeRefreshProgressModal();
+  }
+});
 
 tabWatchlist.addEventListener('click', () => setActiveTab('unwatched'));
 tabWatched.addEventListener('click', () => setActiveTab('watched'));

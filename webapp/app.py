@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -19,13 +20,16 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 OMDB_URL = "https://www.omdbapi.com/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
 OMDB_API_KEY = os.environ.get("OMDB_API_KEY", "thewdb")
 
 app = Flask(__name__)
+
+_refresh_lock = threading.Lock()
+_refresh_state: dict[str, dict[str, int | bool]] = {}
 
 
 @dataclass
@@ -382,6 +386,66 @@ def _refresh_title_details(
     )
 
 
+def _start_refresh(room: str, user_agent: str) -> int:
+    with _get_db() as conn:
+        _migrate_db(conn)
+        rows = conn.execute(
+            "SELECT title_id, type_label FROM lists WHERE room = ?",
+            (room,),
+        ).fetchall()
+    items = [(row["title_id"], row["type_label"]) for row in rows]
+    total = len(items)
+    with _refresh_lock:
+        _refresh_state[room] = {"refreshing": True, "processed": 0, "total": total}
+
+    def _run_refresh() -> None:
+        with _get_db() as conn:
+            _migrate_db(conn)
+            for title_id, type_label in items:
+                normalized_type = _normalize_type_label(type_label)
+                if normalized_type not in ALLOWED_TYPE_LABELS:
+                    normalized_type = "movie"
+                (
+                    imdb_rating,
+                    rotten_rating,
+                    runtime_minutes,
+                    total_seasons,
+                    total_episodes,
+                    avg_episode_length,
+                ) = _refresh_title_details(conn, title_id, user_agent, normalized_type)
+                conn.execute(
+                    """
+                    UPDATE lists
+                    SET rating = ?, rotten_tomatoes = ?, runtime_minutes = ?, total_seasons = ?,
+                        total_episodes = ?, avg_episode_length = ?
+                    WHERE room = ? AND title_id = ?
+                    """,
+                    (
+                        imdb_rating,
+                        rotten_rating,
+                        runtime_minutes,
+                        total_seasons,
+                        total_episodes,
+                        avg_episode_length,
+                        room,
+                        title_id,
+                    ),
+                )
+                conn.commit()
+                with _refresh_lock:
+                    state = _refresh_state.get(room)
+                    if state:
+                        state["processed"] = int(state.get("processed", 0)) + 1
+            with _refresh_lock:
+                state = _refresh_state.get(room)
+                if state:
+                    state["refreshing"] = False
+
+    thread = threading.Thread(target=_run_refresh, daemon=True)
+    thread.start()
+    return total
+
+
 def parse_suggestion_item(
     item: dict[str, Any], user_agent: str, include_details: bool = True
 ) -> SearchResult | None:
@@ -592,46 +656,22 @@ def api_refresh() -> Any:
     if not room:
         return jsonify({"error": "missing_room"}), 400
     user_agent = _request_user_agent()
-    with _get_db() as conn:
-        _migrate_db(conn)
-        rows = conn.execute(
-            "SELECT title_id, type_label FROM lists WHERE room = ?",
-            (room,),
-        ).fetchall()
-        for row in rows:
-            title_id = row["title_id"]
-            type_label = row["type_label"]
-            normalized_type = _normalize_type_label(type_label)
-            if normalized_type not in ALLOWED_TYPE_LABELS:
-                normalized_type = "movie"
-            (
-                imdb_rating,
-                rotten_rating,
-                runtime_minutes,
-                total_seasons,
-                total_episodes,
-                avg_episode_length,
-            ) = _refresh_title_details(conn, title_id, user_agent, normalized_type)
-            conn.execute(
-                """
-                UPDATE lists
-                SET rating = ?, rotten_tomatoes = ?, runtime_minutes = ?, total_seasons = ?,
-                    total_episodes = ?, avg_episode_length = ?
-                WHERE room = ? AND title_id = ?
-                """,
-                (
-                    imdb_rating,
-                    rotten_rating,
-                    runtime_minutes,
-                    total_seasons,
-                    total_episodes,
-                    avg_episode_length,
-                    room,
-                    title_id,
-                ),
-            )
-        conn.commit()
-    return jsonify({"status": "ok"})
+    with _refresh_lock:
+        state = _refresh_state.get(room)
+        if state and state.get("refreshing"):
+            return jsonify({"error": "refresh_in_progress"}), 409
+    total = _start_refresh(room, user_agent)
+    return jsonify({"status": "started", "total": total})
+
+
+@app.route("/api/refresh/status")
+def api_refresh_status() -> Any:
+    room = request.args.get("room", "")
+    if not room:
+        return jsonify({"error": "missing_room"}), 400
+    with _refresh_lock:
+        state = _refresh_state.get(room, {"refreshing": False, "processed": 0, "total": 0})
+        return jsonify(state)
 
 
 @app.route("/api/trending")
@@ -697,8 +737,8 @@ def api_add() -> Any:
     with _get_db() as conn:
         _migrate_db(conn)
         next_position = conn.execute(
-            "SELECT COALESCE(MIN(position), 0) - 1 FROM lists WHERE room = ?",
-            (room,),
+            "SELECT COALESCE(MIN(position), 0) - 1 FROM lists WHERE room = ? AND watched = ?",
+            (room, watched),
         ).fetchone()[0]
         conn.execute(
             """
