@@ -31,6 +31,14 @@ let activeSearchController;
 let lastSearchQuery = '';
 let lastSearchResults = [];
 let dragSource = null;
+let draggingCard = null;
+let draggingPointerId = null;
+let draggingStartY = 0;
+let draggingOffsetY = 0;
+let isReordering = false;
+let activeDragHandle = null;
+let dragPlaceholder = null;
+let dragOriginRect = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -369,6 +377,82 @@ const syncOrder = async () => {
   }
 };
 
+const onTouchDragMove = (event) => {
+  if (!draggingCard) {
+    return;
+  }
+  event.preventDefault();
+  const hoveredCards = document.elementsFromPoint(event.clientX, event.clientY);
+  const targetCard = hoveredCards
+    .map((node) => node.closest?.('.card'))
+    .find((card) => card && card !== draggingCard && card.parentElement === listResults);
+  if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
+    draggingOffsetY = event.clientY - draggingStartY;
+    draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
+    return;
+  }
+  dragSource = event.currentTarget;
+  dragSource.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', dragSource.dataset.titleId || '');
+};
+
+const onTouchDragEnd = async () => {
+  if (!draggingCard) {
+    return;
+  }
+  listResults.querySelectorAll('.card').forEach((card) => {
+    card.style.transform = '';
+  });
+  draggingCard.style.transform = '';
+  draggingCard.style.position = '';
+  draggingCard.style.left = '';
+  draggingCard.style.top = '';
+  draggingCard.style.width = '';
+  draggingCard.classList.remove('dragging');
+  if (dragPlaceholder) {
+    listResults.insertBefore(draggingCard, dragPlaceholder);
+    dragPlaceholder.remove();
+    dragPlaceholder = null;
+  }
+  draggingCard = null;
+  draggingPointerId = null;
+  draggingStartY = 0;
+  draggingOffsetY = 0;
+  dragOriginRect = null;
+  listResults.classList.remove('is-reordering');
+  listResults.classList.remove('is-dragging');
+  isReordering = false;
+  await syncOrder();
+};
+
+const stopTouchDragListeners = () => {
+  if (!activeDragHandle || draggingPointerId === null) {
+    return;
+  }
+  activeDragHandle.releasePointerCapture(draggingPointerId);
+  document.removeEventListener('pointermove', onTouchDragMove);
+  document.removeEventListener('pointerup', onTouchDragPointerUp);
+  document.removeEventListener('pointercancel', onTouchDragPointerCancel);
+  activeDragHandle = null;
+};
+
+const onTouchDragPointerUp = (event) => {
+  if (draggingPointerId !== event.pointerId) {
+    return;
+  }
+  stopTouchDragListeners();
+  onTouchDragEnd();
+};
+
+const onTouchDragPointerCancel = (event) => {
+  if (draggingPointerId !== event.pointerId) {
+    return;
+  }
+  stopTouchDragListeners();
+  onTouchDragEnd();
+};
+
 const onCardDragStart = (event) => {
   if (event.target.closest('.card-action')) {
     event.preventDefault();
@@ -392,6 +476,42 @@ const onCardDragEnd = async () => {
 const attachDragHandlers = () => {
   listResults.querySelectorAll('.card').forEach((card) => {
     card.setAttribute('draggable', 'true');
+    card.querySelectorAll('.card-drag-handle').forEach((handle) => {
+      handle.addEventListener('pointerdown', (event) => {
+        if (event.pointerType !== 'touch') {
+          return;
+        }
+        const targetCard = event.currentTarget.closest('.card');
+        if (!targetCard) {
+          return;
+        }
+        if (draggingCard) {
+          stopTouchDragListeners();
+        }
+        draggingCard = targetCard;
+        draggingPointerId = event.pointerId;
+        dragOriginRect = targetCard.getBoundingClientRect();
+        draggingStartY = event.clientY;
+        draggingOffsetY = 0;
+        activeDragHandle = event.currentTarget;
+        listResults.classList.add('is-dragging');
+        targetCard.classList.add('dragging');
+        dragPlaceholder = document.createElement('div');
+        dragPlaceholder.className = 'card drag-placeholder';
+        dragPlaceholder.style.height = `${dragOriginRect.height}px`;
+        dragPlaceholder.style.width = `${dragOriginRect.width}px`;
+        listResults.insertBefore(dragPlaceholder, targetCard.nextSibling);
+        targetCard.style.position = 'fixed';
+        targetCard.style.left = `${dragOriginRect.left}px`;
+        targetCard.style.top = `${dragOriginRect.top}px`;
+        targetCard.style.width = `${dragOriginRect.width}px`;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        document.addEventListener('pointermove', onTouchDragMove, { passive: false });
+        document.addEventListener('pointerup', onTouchDragPointerUp);
+        document.addEventListener('pointercancel', onTouchDragPointerCancel);
+        event.preventDefault();
+      });
+    });
   });
 };
 
