@@ -3,7 +3,6 @@ const searchInput = document.getElementById('search-input');
 const searchButton = document.getElementById('search-button');
 const searchResults = document.getElementById('search-results');
 const searchModal = document.getElementById('search-modal');
-const searchModalClose = document.getElementById('search-modal-close');
 const trendingResults = document.getElementById('trending-results');
 const trendingModal = document.getElementById('trending-modal');
 const trendingModalClose = document.getElementById('trending-modal-close');
@@ -13,6 +12,7 @@ const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
 const trendingButton = document.getElementById('open-trending');
+const refreshDatabaseButton = document.getElementById('refresh-database');
 const menu = document.querySelector('.menu');
 const roomTagButton = document.getElementById('room-tag-button');
 const renameModal = document.getElementById('rename-modal');
@@ -23,8 +23,13 @@ const renameModalClose = document.getElementById('rename-modal-close');
 const imageModal = document.getElementById('image-modal');
 const imageModalClose = document.getElementById('image-modal-close');
 const imageModalImage = document.getElementById('image-modal-image');
+const listPagination = document.getElementById('list-pagination');
+const listPrev = document.getElementById('list-prev');
+const listNext = document.getElementById('list-next');
+const listPageStatus = document.getElementById('list-page-status');
 
 const MAX_RESULTS = 10;
+const PAGE_SIZE = 10;
 let activeTab = 'unwatched';
 let searchTimer;
 let activeSearchController;
@@ -37,6 +42,10 @@ let draggingOffsetY = 0;
 let activeDragHandle = null;
 let dragPlaceholder = null;
 let dragOriginRect = null;
+const pageState = { unwatched: 1, watched: 1 };
+const totalPages = { unwatched: 1, watched: 1 };
+const pendingDetailRequests = new Set();
+const detailCache = new Map();
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -111,28 +120,13 @@ const sanitizeRoom = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '');
 
-const buildCard = (item, mode) => {
-  const card = cardTemplate.content.cloneNode(true);
-  const article = card.querySelector('.card');
-  const image = card.querySelector('.card-image');
-  const title = card.querySelector('.card-title-link');
-  const meta = card.querySelector('.card-meta');
-  const rating = card.querySelector('.card-rating');
-  const addButton = card.querySelector('.card-action.primary');
-  const watchedButton = card.querySelector('.card-action.secondary');
-  const removeButton = card.querySelector('.card-action.danger');
-  const dragHandle = card.querySelector('.card-drag-handle');
+const normalizeTypeLabel = (typeLabel) =>
+  (typeLabel || '')
+    .toLowerCase()
+    .replace(/[^a-z]/g, '');
 
-  article.dataset.titleId = item.title_id;
-  image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
-  image.alt = `${item.title} poster`;
-  title.textContent = item.title;
-  title.href = `https://www.imdb.com/title/${item.title_id}/`;
-  image.addEventListener('click', () => {
-    openImageModal(getLargeImage(item.image), `${item.title} poster`);
-  });
-  const typeLabel = (item.type_label || '').toLowerCase();
-  const normalizedType = typeLabel.replace(/[^a-z]/g, '');
+const buildMetaText = (item) => {
+  const normalizedType = normalizeTypeLabel(item.type_label);
   const labelMap = {
     movie: 'Film',
     tvmovie: 'Film',
@@ -173,19 +167,64 @@ const buildCard = (item, mode) => {
       metaParts.push(`Avg ${avgEpisodeLength} min`);
     }
   }
-  meta.textContent = metaParts.join(' • ') || 'Unknown';
+  return metaParts.join(' • ') || 'Unknown';
+};
+
+const buildRatingHtml = (item) => {
   const imdbRating = item.rating || 'N/A';
   const rottenRating = item.rotten_tomatoes || 'N/A';
-  rating.innerHTML = `
-    <span class="rating-badge">
-      <img src="/static/imdb-logo.svg" alt="IMDb" />
-      <span>${imdbRating}</span>
-    </span>
-    <span class="rating-badge">
-      <img src="/static/rotten-tomatoes.svg" alt="Rotten Tomatoes" />
-      <span>${rottenRating}</span>
-    </span>
+  const imdbUrl = `https://www.imdb.com/title/${item.title_id}/`;
+  const searchQuery = encodeURIComponent(
+    item.year ? `${item.title} ${item.year}` : item.title
+  );
+  const rottenUrl = `https://www.rottentomatoes.com/search?search=${searchQuery}`;
+  return `
+    <a class="rating-link" href="${imdbUrl}" target="_blank" rel="noopener noreferrer">
+      <span class="rating-badge">
+        <img src="/static/imdb-logo.svg" alt="IMDb" />
+        <span>${imdbRating}</span>
+      </span>
+    </a>
+    <a class="rating-link" href="${rottenUrl}" target="_blank" rel="noopener noreferrer">
+      <span class="rating-badge">
+        <img src="/static/rotten-tomatoes.svg" alt="Rotten Tomatoes" />
+        <span>${rottenRating}</span>
+      </span>
+    </a>
   `;
+};
+
+const applyCardDetails = (article, item) => {
+  const meta = article.querySelector('.card-meta');
+  const rating = article.querySelector('.card-rating');
+  if (meta) {
+    meta.textContent = buildMetaText(item);
+  }
+  if (rating) {
+    rating.innerHTML = buildRatingHtml(item);
+  }
+};
+
+const buildCard = (item, mode) => {
+  const fragment = cardTemplate.content.cloneNode(true);
+  const article = fragment.querySelector('.card');
+  const image = fragment.querySelector('.card-image');
+  const title = fragment.querySelector('.card-title-link');
+  const addButton = fragment.querySelector('.card-action.primary');
+  const watchedButton = fragment.querySelector('.card-action.secondary');
+  const removeButton = fragment.querySelector('.card-action.danger');
+  const dragHandle = fragment.querySelector('.card-drag-handle');
+
+  article.dataset.titleId = item.title_id;
+  article.dataset.typeLabel = item.type_label || '';
+  image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
+  image.alt = `${item.title} poster`;
+  title.textContent = item.title;
+  title.href = `https://www.imdb.com/title/${item.title_id}/`;
+  image.addEventListener('click', () => {
+    openImageModal(getLargeImage(item.image), `${item.title} poster`);
+  });
+  applyCardDetails(article, item);
 
   if (mode === 'search') {
     addButton.textContent = '＋';
@@ -213,7 +252,48 @@ const buildCard = (item, mode) => {
     removeButton.addEventListener('click', () => removeFromList(item));
   }
 
-  return card;
+  return article;
+};
+
+const needsDetails = (item) => {
+  const hasRating = item.rating !== null && item.rating !== undefined;
+  const hasRotten = item.rotten_tomatoes !== null && item.rotten_tomatoes !== undefined;
+  const hasRuntime = item.runtime_minutes !== null && item.runtime_minutes !== undefined;
+  const hasSeasons = item.total_seasons !== null && item.total_seasons !== undefined;
+  const hasEpisodes = item.total_episodes !== null && item.total_episodes !== undefined;
+  const hasAvg = item.avg_episode_length !== null && item.avg_episode_length !== undefined;
+  return !(hasRating && hasRotten && hasRuntime && hasSeasons && hasEpisodes && hasAvg);
+};
+
+const requestDetails = async (item, article) => {
+  if (!needsDetails(item) || pendingDetailRequests.has(item.title_id)) {
+    return;
+  }
+  if (detailCache.has(item.title_id)) {
+    applyCardDetails(article, { ...item, ...detailCache.get(item.title_id) });
+    return;
+  }
+  pendingDetailRequests.add(item.title_id);
+  try {
+    const response = await fetch(
+      `/api/details?title_id=${encodeURIComponent(item.title_id)}&type_label=${encodeURIComponent(
+        item.type_label || ''
+      )}`
+    );
+    if (!response.ok) {
+      return;
+    }
+    const details = await response.json();
+    detailCache.set(item.title_id, details);
+    const updated = { ...item, ...details };
+    if (article.isConnected) {
+      applyCardDetails(article, updated);
+    }
+  } catch (error) {
+    // no-op
+  } finally {
+    pendingDetailRequests.delete(item.title_id);
+  }
 };
 
 const renderSearchResults = (items) => {
@@ -226,6 +306,7 @@ const renderSearchResults = (items) => {
   limited.forEach((item) => {
     const card = buildCard(item, 'search');
     searchResults.appendChild(card);
+    requestDetails(item, card);
   });
 };
 
@@ -239,6 +320,7 @@ const renderTrendingResults = (items) => {
   limited.forEach((item) => {
     const card = buildCard(item, 'search');
     trendingResults.appendChild(card);
+    requestDetails(item, card);
   });
 };
 
@@ -256,6 +338,7 @@ const renderList = (items) => {
   items.forEach((item) => {
     const card = buildCard(item, 'list');
     listResults.appendChild(card);
+    requestDetails(item, card);
   });
   attachDragHandlers();
 };
@@ -333,18 +416,39 @@ const debounceSearch = () => {
     closeSearchModal();
     return;
   }
-  searchTimer = setTimeout(fetchSearch, 1000);
+  searchTimer = setTimeout(fetchSearch, 250);
 };
 
 const loadList = async () => {
   showStatus(listResults, 'Loading list...');
-  const response = await fetch(`/api/list?room=${encodeURIComponent(room)}&status=${activeTab}`);
+  const page = pageState[activeTab];
+  const response = await fetch(
+    `/api/list?room=${encodeURIComponent(room)}&status=${activeTab}&page=${page}&per_page=${PAGE_SIZE}`
+  );
   if (!response.ok) {
     showStatus(listResults, 'Unable to load list.');
     return;
   }
   const data = await response.json();
+  if (!data.items?.length && page > 1) {
+    pageState[activeTab] = page - 1;
+    await loadList();
+    return;
+  }
+  totalPages[activeTab] = data.total_pages || 1;
   renderList(data.items || []);
+  if (listPageStatus) {
+    listPageStatus.textContent = `Page ${pageState[activeTab]} of ${totalPages[activeTab]}`;
+  }
+  if (listPrev) {
+    listPrev.disabled = pageState[activeTab] <= 1;
+  }
+  if (listNext) {
+    listNext.disabled = pageState[activeTab] >= totalPages[activeTab];
+  }
+  if (listPagination) {
+    listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
+  }
 };
 
 const fetchTrending = async () => {
@@ -383,6 +487,7 @@ const addToList = async (item, watched, cardNode) => {
   if (cardNode) {
     cardNode.querySelector('.card-action.primary').textContent = 'Added';
   }
+  pageState[watched ? 'watched' : 'unwatched'] = 1;
   await loadList();
 };
 
@@ -567,13 +672,7 @@ searchInput.addEventListener('input', debounceSearch);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    debounceSearch();
-  }
-});
-searchModalClose?.addEventListener('click', closeSearchModal);
-searchModal?.addEventListener('click', (event) => {
-  if (event.target === searchModal) {
-    closeSearchModal();
+    fetchSearch();
   }
 });
 trendingModalClose?.addEventListener('click', closeTrendingModal);
@@ -592,6 +691,19 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && imageModal?.classList.contains('is-visible')) {
     closeImageModal();
   }
+});
+document.addEventListener('click', (event) => {
+  if (!searchModal?.classList.contains('is-visible')) {
+    return;
+  }
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    (searchModal.contains(target) || searchInput.contains(target) || searchButton.contains(target))
+  ) {
+    return;
+  }
+  closeSearchModal();
 });
 imageModalClose?.addEventListener('click', closeImageModal);
 imageModal?.addEventListener('click', (event) => {
@@ -630,6 +742,25 @@ if (changeListButton) {
       menu.removeAttribute('open');
     }
     fetchTrending();
+  });
+  refreshDatabaseButton?.addEventListener('click', async () => {
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    if (!confirm('Refresh metadata and scores for this list?')) {
+      return;
+    }
+    const response = await fetch('/api/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room })
+    });
+    if (!response.ok) {
+      alert('Unable to refresh database.');
+      return;
+    }
+    detailCache.clear();
+    await loadList();
   });
 
   renameModalCancel?.addEventListener('click', closeRenameModal);
@@ -676,6 +807,19 @@ if (changeListButton) {
 
 tabWatchlist.addEventListener('click', () => setActiveTab('unwatched'));
 tabWatched.addEventListener('click', () => setActiveTab('watched'));
+
+listPrev?.addEventListener('click', () => {
+  if (pageState[activeTab] > 1) {
+    pageState[activeTab] -= 1;
+    loadList();
+  }
+});
+listNext?.addEventListener('click', () => {
+  if (pageState[activeTab] < totalPages[activeTab]) {
+    pageState[activeTab] += 1;
+    loadList();
+  }
+});
 
 loadList();
 renderSearchResults([]);
