@@ -77,6 +77,23 @@
       </article>
     </template>
 
+    <div class="modal-overlay" id="rename-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Rename List ID</h2>
+          <button class="icon-button" id="rename-modal-close" type="button" aria-label="Close rename prompt">
+            ×
+          </button>
+        </div>
+        <p class="modal-subtitle">Pick a new identifier to share this list.</p>
+        <input id="rename-modal-input" type="text" autocomplete="off" />
+        <div class="modal-actions">
+          <button class="ghost" id="rename-modal-cancel" type="button">Cancel</button>
+          <button id="rename-modal-confirm" type="button">Save</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       window.APP_ROOM = "{{ room }}";
     </script>
