@@ -10,6 +10,11 @@ const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
 const menu = document.querySelector('.menu');
+const renameModal = document.getElementById('rename-modal');
+const renameModalInput = document.getElementById('rename-modal-input');
+const renameModalCancel = document.getElementById('rename-modal-cancel');
+const renameModalConfirm = document.getElementById('rename-modal-confirm');
+const renameModalClose = document.getElementById('rename-modal-close');
 
 let activeTab = 'unwatched';
 let searchTimer;
@@ -22,6 +27,8 @@ let draggingStartY = 0;
 let draggingOffsetY = 0;
 let isReordering = false;
 let activeDragHandle = null;
+let dragPlaceholder = null;
+let dragOriginRect = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -130,8 +137,14 @@ const filterCachedResults = (query) => {
 
 const fetchSearch = async () => {
   const query = searchInput.value.trim();
-  if (query.length < 2) {
+  if (query.length < 3) {
     renderSearchResults([]);
+    lastSearchQuery = '';
+    lastSearchResults = [];
+    if (activeSearchController) {
+      activeSearchController.abort();
+      activeSearchController = null;
+    }
     return;
   }
   if (query.length >= 3 && lastSearchQuery && query.startsWith(lastSearchQuery)) {
@@ -169,7 +182,7 @@ const fetchSearch = async () => {
 
 const debounceSearch = () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(fetchSearch, 200);
+  searchTimer = setTimeout(fetchSearch, 1000);
 };
 
 const updateClearButton = () => {
@@ -253,7 +266,12 @@ const onDragMove = (event) => {
   const positions = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
   const rect = targetCard.getBoundingClientRect();
   const insertBefore = event.clientY < rect.top + rect.height / 2;
-  listResults.insertBefore(draggingCard, insertBefore ? targetCard : targetCard.nextSibling);
+  if (dragPlaceholder) {
+    listResults.insertBefore(
+      dragPlaceholder,
+      insertBefore ? targetCard : targetCard.nextSibling
+    );
+  }
   cards.forEach((card) => {
     if (card === draggingCard) {
       return;
@@ -287,11 +305,21 @@ const onDragEnd = async () => {
     card.style.transform = '';
   });
   draggingCard.style.transform = '';
+  draggingCard.style.position = '';
+  draggingCard.style.left = '';
+  draggingCard.style.top = '';
+  draggingCard.style.width = '';
   draggingCard.classList.remove('dragging');
+  if (dragPlaceholder) {
+    listResults.insertBefore(draggingCard, dragPlaceholder);
+    dragPlaceholder.remove();
+    dragPlaceholder = null;
+  }
   draggingCard = null;
   draggingPointerId = null;
   draggingStartY = 0;
   draggingOffsetY = 0;
+  dragOriginRect = null;
   listResults.classList.remove('is-reordering');
   isReordering = false;
   await syncOrder();
@@ -340,11 +368,21 @@ const attachDragHandlers = () => {
       }
       draggingCard = card;
       draggingPointerId = event.pointerId;
+      dragOriginRect = card.getBoundingClientRect();
       draggingStartY = event.clientY;
       draggingOffsetY = 0;
       activeDragHandle = event.currentTarget;
       listResults.classList.add('is-dragging');
       card.classList.add('dragging');
+      dragPlaceholder = document.createElement('div');
+      dragPlaceholder.className = 'card drag-placeholder';
+      dragPlaceholder.style.height = `${dragOriginRect.height}px`;
+      dragPlaceholder.style.width = `${dragOriginRect.width}px`;
+      listResults.insertBefore(dragPlaceholder, card.nextSibling);
+      card.style.position = 'fixed';
+      card.style.left = `${dragOriginRect.left}px`;
+      card.style.top = `${dragOriginRect.top}px`;
+      card.style.width = `${dragOriginRect.width}px`;
       event.currentTarget.setPointerCapture(event.pointerId);
       document.addEventListener('pointermove', onDragMove);
       document.addEventListener('pointerup', onDragPointerUp);
@@ -392,19 +430,64 @@ searchInput.addEventListener('input', debounceSearch);
 searchInput.addEventListener('input', updateClearButton);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
-    fetchSearch();
+    event.preventDefault();
+    debounceSearch();
   }
 });
 clearSearchButton?.addEventListener('click', clearSearch);
 refreshButton.addEventListener('click', loadList);
 if (changeListButton) {
-  changeListButton.addEventListener('click', async () => {
-    const nextRoomInput = window.prompt('Rename List ID', room);
-    if (nextRoomInput === null) {
+  const closeRenameModal = () => {
+    if (!renameModal) {
       return;
     }
-    const nextRoom = sanitizeRoom(nextRoomInput);
+    renameModal.classList.remove('is-visible');
+    renameModal.setAttribute('aria-hidden', 'true');
+  };
+  const openRenameModal = () => {
+    if (!renameModal || !renameModalInput) {
+      return;
+    }
+    renameModalInput.value = room;
+    renameModal.classList.add('is-visible');
+    renameModal.setAttribute('aria-hidden', 'false');
+    renameModalInput.focus();
+    renameModalInput.select();
+  };
+
+  changeListButton.addEventListener('click', () => {
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    openRenameModal();
+  });
+
+  renameModalCancel?.addEventListener('click', closeRenameModal);
+  renameModalClose?.addEventListener('click', closeRenameModal);
+  renameModal?.addEventListener('click', (event) => {
+    if (event.target === renameModal) {
+      closeRenameModal();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && renameModal?.classList.contains('is-visible')) {
+      closeRenameModal();
+    }
+  });
+  renameModalInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      renameModalConfirm?.click();
+    }
+  });
+
+  renameModalConfirm?.addEventListener('click', async () => {
+    if (!renameModalInput) {
+      return;
+    }
+    const nextRoom = sanitizeRoom(renameModalInput.value);
     if (!nextRoom || nextRoom === room) {
+      closeRenameModal();
       return;
     }
     const response = await fetch('/api/list/rename', {
@@ -416,9 +499,6 @@ if (changeListButton) {
       const data = await response.json().catch(() => ({}));
       alert(data.message || 'Unable to rename list.');
       return;
-    }
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
     }
     window.location.href = `/r/${encodeURIComponent(nextRoom)}`;
   });
