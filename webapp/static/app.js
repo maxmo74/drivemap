@@ -30,12 +30,10 @@ let searchTimer;
 let activeSearchController;
 let lastSearchQuery = '';
 let lastSearchResults = [];
-let dragSource = null;
 let draggingCard = null;
 let draggingPointerId = null;
 let draggingStartY = 0;
 let draggingOffsetY = 0;
-let isReordering = false;
 let activeDragHandle = null;
 let dragPlaceholder = null;
 let dragOriginRect = null;
@@ -124,8 +122,6 @@ const buildCard = (item, mode) => {
   const watchedButton = card.querySelector('.card-action.secondary');
   const removeButton = card.querySelector('.card-action.danger');
   const dragHandle = card.querySelector('.card-drag-handle');
-  const moveUpButton = card.querySelector('.card-action.move-up');
-  const moveDownButton = card.querySelector('.card-action.move-down');
 
   article.dataset.titleId = item.title_id;
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
@@ -135,14 +131,49 @@ const buildCard = (item, mode) => {
   image.addEventListener('click', () => {
     openImageModal(getLargeImage(item.image), `${item.title} poster`);
   });
-  const parts = [];
-  if (item.type_label) {
-    parts.push(item.type_label.toUpperCase());
+  const typeLabel = (item.type_label || '').toLowerCase();
+  const normalizedType = typeLabel.replace(/[^a-z]/g, '');
+  const labelMap = {
+    movie: 'Film',
+    tvmovie: 'Film',
+    feature: 'Film',
+    tvseries: 'Series',
+    tvminiseries: 'Mini Series'
+  };
+  const metaParts = [];
+  const displayLabel = labelMap[normalizedType] || (item.type_label || '').toUpperCase();
+  if (displayLabel) {
+    metaParts.push(displayLabel);
   }
   if (item.year) {
-    parts.push(item.year);
+    metaParts.push(item.year);
   }
-  meta.textContent = parts.join(' • ') || 'Unknown';
+  const runtimeMinutes = Number(item.runtime_minutes);
+  const avgEpisodeLength = Number(item.avg_episode_length);
+  if (normalizedType === 'movie' || normalizedType === 'tvmovie' || normalizedType === 'feature') {
+    if (Number.isFinite(runtimeMinutes) && runtimeMinutes > 0) {
+      metaParts.push(`${runtimeMinutes} min`);
+    }
+  }
+  if (normalizedType === 'tvseries') {
+    if (item.total_seasons) {
+      const seasonsLabel = Number(item.total_seasons) === 1 ? 'season' : 'seasons';
+      metaParts.push(`${item.total_seasons} ${seasonsLabel}`);
+    }
+    if (Number.isFinite(avgEpisodeLength) && avgEpisodeLength > 0) {
+      metaParts.push(`Avg ${avgEpisodeLength} min`);
+    }
+  }
+  if (normalizedType === 'tvminiseries') {
+    if (item.total_episodes) {
+      const episodesLabel = Number(item.total_episodes) === 1 ? 'episode' : 'episodes';
+      metaParts.push(`${item.total_episodes} ${episodesLabel}`);
+    }
+    if (Number.isFinite(avgEpisodeLength) && avgEpisodeLength > 0) {
+      metaParts.push(`Avg ${avgEpisodeLength} min`);
+    }
+  }
+  meta.textContent = metaParts.join(' • ') || 'Unknown';
   const imdbRating = item.rating || 'N/A';
   const rottenRating = item.rotten_tomatoes || 'N/A';
   rating.innerHTML = `
@@ -165,14 +196,9 @@ const buildCard = (item, mode) => {
     watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
-    moveUpButton.remove();
-    moveDownButton.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
-    article.setAttribute('draggable', 'true');
-    article.addEventListener('dragstart', onCardDragStart);
-    article.addEventListener('dragend', onCardDragEnd);
     addButton.textContent = item.watched ? '↺' : '✓';
     addButton.setAttribute(
       'aria-label',
@@ -377,27 +403,40 @@ const syncOrder = async () => {
   }
 };
 
-const onTouchDragMove = (event) => {
-  if (!draggingCard) {
+const getDragAfterElement = (container, y) => {
+  const cards = [
+    ...container.querySelectorAll('.card:not(.dragging):not(.drag-placeholder)')
+  ];
+  let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+  cards.forEach((card) => {
+    const box = card.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      closest = { offset, element: card };
+    }
+  });
+  return closest.element;
+};
+
+const onPointerDragMove = (event) => {
+  if (!draggingCard || event.pointerId !== draggingPointerId) {
     return;
   }
   event.preventDefault();
-  const hoveredCards = document.elementsFromPoint(event.clientX, event.clientY);
-  const targetCard = hoveredCards
-    .map((node) => node.closest?.('.card'))
-    .find((card) => card && card !== draggingCard && card.parentElement === listResults);
-  if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
-    draggingOffsetY = event.clientY - draggingStartY;
-    draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
+  draggingOffsetY = event.clientY - draggingStartY;
+  draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
+  const afterElement = getDragAfterElement(listResults, event.clientY);
+  if (!dragPlaceholder) {
     return;
   }
-  dragSource = event.currentTarget;
-  dragSource.classList.add('dragging');
-  event.dataTransfer.effectAllowed = 'move';
-  event.dataTransfer.setData('text/plain', dragSource.dataset.titleId || '');
+  if (!afterElement) {
+    listResults.appendChild(dragPlaceholder);
+    return;
+  }
+  listResults.insertBefore(dragPlaceholder, afterElement);
 };
 
-const onTouchDragEnd = async () => {
+const onPointerDragEnd = async () => {
   if (!draggingCard) {
     return;
   }
@@ -420,73 +459,47 @@ const onTouchDragEnd = async () => {
   draggingStartY = 0;
   draggingOffsetY = 0;
   dragOriginRect = null;
-  listResults.classList.remove('is-reordering');
   listResults.classList.remove('is-dragging');
-  isReordering = false;
   await syncOrder();
 };
 
-const stopTouchDragListeners = () => {
+const stopPointerDragListeners = () => {
   if (!activeDragHandle || draggingPointerId === null) {
     return;
   }
   activeDragHandle.releasePointerCapture(draggingPointerId);
-  document.removeEventListener('pointermove', onTouchDragMove);
-  document.removeEventListener('pointerup', onTouchDragPointerUp);
-  document.removeEventListener('pointercancel', onTouchDragPointerCancel);
+  document.removeEventListener('pointermove', onPointerDragMove);
+  document.removeEventListener('pointerup', onPointerDragPointerUp);
+  document.removeEventListener('pointercancel', onPointerDragPointerCancel);
   activeDragHandle = null;
 };
 
-const onTouchDragPointerUp = (event) => {
+const onPointerDragPointerUp = (event) => {
   if (draggingPointerId !== event.pointerId) {
     return;
   }
-  stopTouchDragListeners();
-  onTouchDragEnd();
+  stopPointerDragListeners();
+  onPointerDragEnd();
 };
 
-const onTouchDragPointerCancel = (event) => {
+const onPointerDragPointerCancel = (event) => {
   if (draggingPointerId !== event.pointerId) {
     return;
   }
-  stopTouchDragListeners();
-  onTouchDragEnd();
-};
-
-const onCardDragStart = (event) => {
-  if (event.target.closest('.card-action')) {
-    event.preventDefault();
-    return;
-  }
-  dragSource = event.currentTarget;
-  dragSource.classList.add('dragging');
-  event.dataTransfer.effectAllowed = 'move';
-  event.dataTransfer.setData('text/plain', dragSource.dataset.titleId || '');
-};
-
-const onCardDragEnd = async () => {
-  if (!dragSource) {
-    return;
-  }
-  dragSource.classList.remove('dragging');
-  dragSource = null;
-  await syncOrder();
+  stopPointerDragListeners();
+  onPointerDragEnd();
 };
 
 const attachDragHandlers = () => {
   listResults.querySelectorAll('.card').forEach((card) => {
-    card.setAttribute('draggable', 'true');
     card.querySelectorAll('.card-drag-handle').forEach((handle) => {
       handle.addEventListener('pointerdown', (event) => {
-        if (event.pointerType !== 'touch') {
-          return;
-        }
         const targetCard = event.currentTarget.closest('.card');
         if (!targetCard) {
           return;
         }
         if (draggingCard) {
-          stopTouchDragListeners();
+          stopPointerDragListeners();
         }
         draggingCard = targetCard;
         draggingPointerId = event.pointerId;
@@ -501,14 +514,15 @@ const attachDragHandlers = () => {
         dragPlaceholder.style.height = `${dragOriginRect.height}px`;
         dragPlaceholder.style.width = `${dragOriginRect.width}px`;
         listResults.insertBefore(dragPlaceholder, targetCard.nextSibling);
+        listResults.classList.add('is-dragging');
         targetCard.style.position = 'fixed';
         targetCard.style.left = `${dragOriginRect.left}px`;
         targetCard.style.top = `${dragOriginRect.top}px`;
         targetCard.style.width = `${dragOriginRect.width}px`;
         event.currentTarget.setPointerCapture(event.pointerId);
-        document.addEventListener('pointermove', onTouchDragMove, { passive: false });
-        document.addEventListener('pointerup', onTouchDragPointerUp);
-        document.addEventListener('pointercancel', onTouchDragPointerCancel);
+        document.addEventListener('pointermove', onPointerDragMove, { passive: false });
+        document.addEventListener('pointerup', onPointerDragPointerUp);
+        document.addEventListener('pointercancel', onPointerDragPointerCancel);
         event.preventDefault();
       });
     });
@@ -665,17 +679,3 @@ tabWatched.addEventListener('click', () => setActiveTab('watched'));
 
 loadList();
 renderSearchResults([]);
-
-listResults?.addEventListener('dragover', (event) => {
-  event.preventDefault();
-  const targetCard = event.target.closest('.card');
-  if (!dragSource || !targetCard || targetCard === dragSource) {
-    return;
-  }
-  if (targetCard.parentElement !== listResults) {
-    return;
-  }
-  const rect = targetCard.getBoundingClientRect();
-  const insertBefore = event.clientY < rect.top + rect.height / 2;
-  listResults.insertBefore(dragSource, insertBefore ? targetCard : targetCard.nextSibling);
-});

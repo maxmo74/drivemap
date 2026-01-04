@@ -19,7 +19,7 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 OMDB_URL = "https://www.omdbapi.com/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.2.7"
+APP_VERSION = "1.3.0"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
@@ -37,6 +37,10 @@ class SearchResult:
     image: str | None
     rating: str | None
     rotten_tomatoes: str | None
+    runtime_minutes: int | None
+    total_seasons: int | None
+    total_episodes: int | None
+    avg_episode_length: int | None
 
 
 
@@ -69,6 +73,15 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
             rotten_tomatoes TEXT,
             cached_at INTEGER NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS metadata_cache (
+            title_id TEXT PRIMARY KEY,
+            runtime_minutes INTEGER,
+            total_seasons INTEGER,
+            total_episodes INTEGER,
+            avg_episode_length INTEGER,
+            cached_at INTEGER NOT NULL
+        );
         """
     )
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(lists)")}
@@ -84,9 +97,26 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
         _backfill_positions(conn)
     if "rotten_tomatoes" not in columns:
         conn.execute("ALTER TABLE lists ADD COLUMN rotten_tomatoes TEXT")
+    if "runtime_minutes" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN runtime_minutes INTEGER")
+    if "total_seasons" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN total_seasons INTEGER")
+    if "total_episodes" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN total_episodes INTEGER")
+    if "avg_episode_length" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN avg_episode_length INTEGER")
     rating_columns = {row["name"] for row in conn.execute("PRAGMA table_info(rating_cache)")}
     if "rotten_tomatoes" not in rating_columns:
         conn.execute("ALTER TABLE rating_cache ADD COLUMN rotten_tomatoes TEXT")
+    metadata_columns = {row["name"] for row in conn.execute("PRAGMA table_info(metadata_cache)")}
+    if "runtime_minutes" not in metadata_columns:
+        conn.execute("ALTER TABLE metadata_cache ADD COLUMN runtime_minutes INTEGER")
+    if "total_seasons" not in metadata_columns:
+        conn.execute("ALTER TABLE metadata_cache ADD COLUMN total_seasons INTEGER")
+    if "total_episodes" not in metadata_columns:
+        conn.execute("ALTER TABLE metadata_cache ADD COLUMN total_episodes INTEGER")
+    if "avg_episode_length" not in metadata_columns:
+        conn.execute("ALTER TABLE metadata_cache ADD COLUMN avg_episode_length INTEGER")
 
 
 def _backfill_positions(conn: sqlite3.Connection, force: bool = False) -> None:
@@ -147,6 +177,46 @@ def _rating_cache_set(
     )
 
 
+def _metadata_cache_get(
+    conn: sqlite3.Connection, title_id: str
+) -> tuple[int | None, int | None, int | None, int | None] | None:
+    row = conn.execute(
+        """
+        SELECT runtime_minutes, total_seasons, total_episodes, avg_episode_length, cached_at
+        FROM metadata_cache WHERE title_id = ?
+        """,
+        (title_id,),
+    ).fetchone()
+    if not row:
+        return None
+    if int(row["cached_at"]) + CACHE_TTL_SECONDS < int(time.time()):
+        return None
+    return (
+        row["runtime_minutes"],
+        row["total_seasons"],
+        row["total_episodes"],
+        row["avg_episode_length"],
+    )
+
+
+def _metadata_cache_set(
+    conn: sqlite3.Connection,
+    title_id: str,
+    runtime_minutes: int | None,
+    total_seasons: int | None,
+    total_episodes: int | None,
+    avg_episode_length: int | None,
+) -> None:
+    conn.execute(
+        """
+        REPLACE INTO metadata_cache (
+            title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length, cached_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length, int(time.time())),
+    )
+
+
 def _fetch_rotten_tomatoes(title_id: str, user_agent: str) -> str | None:
     if not OMDB_API_KEY:
         return None
@@ -165,6 +235,73 @@ def _fetch_rotten_tomatoes(title_id: str, user_agent: str) -> str | None:
         if rating.get("Source") == "Rotten Tomatoes":
             return rating.get("Value")
     return None
+
+
+def _fetch_omdb_title(title_id: str, user_agent: str, season: int | None = None) -> dict[str, Any]:
+    if not OMDB_API_KEY:
+        return {}
+    params: dict[str, Any] = {"i": title_id, "apikey": OMDB_API_KEY}
+    if season is not None:
+        params["Season"] = season
+    response = requests.get(
+        OMDB_URL,
+        params=params,
+        headers={"User-Agent": user_agent},
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("Response") != "True":
+        return {}
+    return payload
+
+
+def _parse_runtime(runtime: str | None) -> int | None:
+    if not runtime or runtime == "N/A":
+        return None
+    match = re.search(r"(\d+)", runtime)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _fetch_metadata(
+    title_id: str, user_agent: str, normalized_type: str
+) -> tuple[int | None, int | None, int | None, int | None]:
+    payload = _fetch_omdb_title(title_id, user_agent)
+    runtime_minutes = _parse_runtime(payload.get("Runtime"))
+    total_seasons = payload.get("totalSeasons")
+    try:
+        total_seasons_int = int(total_seasons) if total_seasons else None
+    except ValueError:
+        total_seasons_int = None
+    avg_episode_length = runtime_minutes if normalized_type in {"tvseries", "tvminiseries"} else None
+    total_episodes = None
+    if normalized_type == "tvminiseries" and total_seasons_int:
+        total_episodes_count = 0
+        for season in range(1, total_seasons_int + 1):
+            season_payload = _fetch_omdb_title(title_id, user_agent, season=season)
+            episodes = season_payload.get("Episodes") or []
+            total_episodes_count += len(episodes)
+        total_episodes = total_episodes_count if total_episodes_count else None
+    return runtime_minutes, total_seasons_int, total_episodes, avg_episode_length
+
+
+def get_metadata(
+    title_id: str, user_agent: str, normalized_type: str
+) -> tuple[int | None, int | None, int | None, int | None]:
+    with _get_db() as conn:
+        _migrate_db(conn)
+        cached = _metadata_cache_get(conn, title_id)
+        if cached is not None:
+            return cached
+        try:
+            metadata = _fetch_metadata(title_id, user_agent, normalized_type)
+        except requests.RequestException:
+            metadata = (None, None, None, None)
+        _metadata_cache_set(conn, title_id, *metadata)
+        conn.commit()
+        return metadata
 
 
 def _fetch_ratings(title_id: str, user_agent: str) -> tuple[str | None, str | None]:
@@ -224,6 +361,9 @@ def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult
     if normalized_type not in ALLOWED_TYPE_LABELS:
         return None
     image_url = item.get("i", {}).get("imageUrl")
+    runtime_minutes, total_seasons, total_episodes, avg_episode_length = get_metadata(
+        title_id, user_agent, normalized_type
+    )
     return SearchResult(
         title_id=title_id,
         title=item.get("l") or "Untitled",
@@ -232,6 +372,10 @@ def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult
         image=_shrink_image_url(image_url),
         rating=get_rating(title_id, user_agent),
         rotten_tomatoes=get_rotten_tomatoes(title_id, user_agent),
+        runtime_minutes=runtime_minutes,
+        total_seasons=total_seasons,
+        total_episodes=total_episodes,
+        avg_episode_length=avg_episode_length,
     )
 
 
@@ -317,6 +461,10 @@ def serialize_result(result: SearchResult) -> dict[str, Any]:
         "image": result.image,
         "rating": result.rating,
         "rotten_tomatoes": result.rotten_tomatoes,
+        "runtime_minutes": result.runtime_minutes,
+        "total_seasons": result.total_seasons,
+        "total_episodes": result.total_episodes,
+        "avg_episode_length": result.avg_episode_length,
     }
 
 
@@ -420,7 +568,12 @@ def api_add() -> Any:
             (room,),
         ).fetchone()[0]
         conn.execute(
-            "REPLACE INTO lists (room, title_id, title, year, type_label, image, rating, rotten_tomatoes, added_at, watched) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            """
+            REPLACE INTO lists (
+                room, title_id, title, year, type_label, image, rating, rotten_tomatoes,
+                runtime_minutes, total_seasons, total_episodes, avg_episode_length, added_at, watched
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             (
                 room,
                 title_id,
@@ -430,6 +583,10 @@ def api_add() -> Any:
                 data.get("image"),
                 data.get("rating"),
                 data.get("rotten_tomatoes"),
+                data.get("runtime_minutes"),
+                data.get("total_seasons"),
+                data.get("total_episodes"),
+                data.get("avg_episode_length"),
                 int(time.time()),
                 watched,
             ),
