@@ -18,7 +18,7 @@ CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.2.5"
+APP_VERSION = "1.2.7"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
@@ -34,6 +34,7 @@ class SearchResult:
     type_label: str | None
     image: str | None
     rating: str | None
+    rotten_tomatoes: str | None
 
 
 
@@ -54,6 +55,7 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
             type_label TEXT,
             image TEXT,
             rating TEXT,
+            rotten_tomatoes TEXT,
             added_at INTEGER NOT NULL,
             position INTEGER,
             PRIMARY KEY (room, title_id)
@@ -62,6 +64,7 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS rating_cache (
             title_id TEXT PRIMARY KEY,
             rating TEXT,
+            rotten_tomatoes TEXT,
             cached_at INTEGER NOT NULL
         );
         """
@@ -77,6 +80,11 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
     else:
         conn.execute("UPDATE lists SET position = NULL WHERE position = 0")
         _backfill_positions(conn)
+    if "rotten_tomatoes" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN rotten_tomatoes TEXT")
+    rating_columns = {row["name"] for row in conn.execute("PRAGMA table_info(rating_cache)")}
+    if "rotten_tomatoes" not in rating_columns:
+        conn.execute("ALTER TABLE rating_cache ADD COLUMN rotten_tomatoes TEXT")
 
 
 def _backfill_positions(conn: sqlite3.Connection, force: bool = False) -> None:
@@ -113,54 +121,109 @@ def init_db() -> None:
         _migrate_db(conn)
 
 
-def _rating_cache_get(conn: sqlite3.Connection, title_id: str) -> str | None:
+def _rating_cache_get(conn: sqlite3.Connection, title_id: str) -> tuple[str | None, str | None] | None:
     row = conn.execute(
-        "SELECT rating, cached_at FROM rating_cache WHERE title_id = ?",
+        "SELECT rating, rotten_tomatoes, cached_at FROM rating_cache WHERE title_id = ?",
         (title_id,),
     ).fetchone()
     if not row:
         return None
     if int(row["cached_at"]) + CACHE_TTL_SECONDS < int(time.time()):
         return None
-    return row["rating"]
+    return row["rating"], row["rotten_tomatoes"]
 
 
-def _rating_cache_set(conn: sqlite3.Connection, title_id: str, rating: str | None) -> None:
+def _rating_cache_set(
+    conn: sqlite3.Connection,
+    title_id: str,
+    rating: str | None,
+    rotten_tomatoes: str | None,
+) -> None:
     conn.execute(
-        "REPLACE INTO rating_cache (title_id, rating, cached_at) VALUES (?, ?, ?)",
-        (title_id, rating, int(time.time())),
+        "REPLACE INTO rating_cache (title_id, rating, rotten_tomatoes, cached_at) VALUES (?, ?, ?, ?)",
+        (title_id, rating, rotten_tomatoes, int(time.time())),
     )
 
 
-def _fetch_rating(title_id: str, user_agent: str) -> str | None:
+def _extract_rotten_tomatoes(payload: dict[str, Any]) -> str | None:
+    def walk(node: Any) -> dict[str, Any] | None:
+        if isinstance(node, dict):
+            if "rottenTomatoes" in node and isinstance(node["rottenTomatoes"], dict):
+                return node["rottenTomatoes"]
+            for value in node.values():
+                found = walk(value)
+                if found:
+                    return found
+        elif isinstance(node, list):
+            for value in node:
+                found = walk(value)
+                if found:
+                    return found
+        return None
+
+    rotten = walk(payload)
+    if not rotten:
+        return None
+    for key in ("tMeterScore", "criticScore", "score"):
+        value = rotten.get(key)
+        if value is None:
+            continue
+        if isinstance(value, (int, float)):
+            return f"{int(value)}%"
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned:
+                return cleaned if cleaned.endswith("%") else f"{cleaned}%"
+    return None
+
+
+def _fetch_ratings(title_id: str, user_agent: str) -> tuple[str | None, str | None]:
     headers = {"User-Agent": user_agent}
     response = requests.get(IMDB_TITLE_URL.format(title_id=title_id), headers=headers, timeout=10)
     response.raise_for_status()
     match = re.search(r'<script type="application/ld\+json">(.*?)</script>', response.text, re.S)
     if not match:
-        return None
-    try:
-        data = json.loads(match.group(1))
-    except json.JSONDecodeError:
-        return None
-    rating = data.get("aggregateRating", {}).get("ratingValue")
-    if rating is None:
-        return None
-    return str(rating)
+        imdb_rating = None
+    else:
+        try:
+            data = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            data = {}
+        imdb_rating = data.get("aggregateRating", {}).get("ratingValue")
+        imdb_rating = str(imdb_rating) if imdb_rating is not None else None
+    rotten_rating = None
+    next_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', response.text, re.S)
+    if next_match:
+        try:
+            next_data = json.loads(next_match.group(1))
+            rotten_rating = _extract_rotten_tomatoes(next_data)
+        except json.JSONDecodeError:
+            rotten_rating = None
+    return imdb_rating, rotten_rating
 
 
-def get_rating(title_id: str, user_agent: str) -> str | None:
+def get_ratings(title_id: str, user_agent: str) -> tuple[str | None, str | None]:
     with _get_db() as conn:
         cached = _rating_cache_get(conn, title_id)
         if cached is not None:
             return cached
         try:
-            rating = _fetch_rating(title_id, user_agent)
+            imdb_rating, rotten_rating = _fetch_ratings(title_id, user_agent)
         except requests.RequestException:
-            rating = None
-        _rating_cache_set(conn, title_id, rating)
+            imdb_rating, rotten_rating = None, None
+        _rating_cache_set(conn, title_id, imdb_rating, rotten_rating)
         conn.commit()
-        return rating
+        return imdb_rating, rotten_rating
+
+
+def get_rating(title_id: str, user_agent: str) -> str | None:
+    imdb_rating, _ = get_ratings(title_id, user_agent)
+    return imdb_rating
+
+
+def get_rotten_tomatoes(title_id: str, user_agent: str) -> str | None:
+    _, rotten_rating = get_ratings(title_id, user_agent)
+    return rotten_rating
 
 
 def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult | None:
@@ -182,6 +245,7 @@ def parse_suggestion_item(item: dict[str, Any], user_agent: str) -> SearchResult
         type_label=type_label,
         image=_shrink_image_url(image_url),
         rating=get_rating(title_id, user_agent),
+        rotten_tomatoes=get_rotten_tomatoes(title_id, user_agent),
     )
 
 
@@ -266,6 +330,7 @@ def serialize_result(result: SearchResult) -> dict[str, Any]:
         "type_label": result.type_label,
         "image": result.image,
         "rating": result.rating,
+        "rotten_tomatoes": result.rotten_tomatoes,
     }
 
 
@@ -342,9 +407,8 @@ def api_list() -> Any:
     watched_flag = 1 if status == "watched" else 0
     with _get_db() as conn:
         _migrate_db(conn)
-        order_by = "position ASC, added_at DESC" if watched_flag == 0 else "added_at DESC"
         rows = conn.execute(
-            f"SELECT * FROM lists WHERE room = ? AND watched = ? ORDER BY {order_by}",
+            "SELECT * FROM lists WHERE room = ? AND watched = ? ORDER BY position ASC, added_at DESC",
             (room, watched_flag),
         ).fetchall()
     return jsonify({"items": [dict(row) for row in rows]})
@@ -370,7 +434,7 @@ def api_add() -> Any:
             (room,),
         ).fetchone()[0]
         conn.execute(
-            "REPLACE INTO lists (room, title_id, title, year, type_label, image, rating, added_at, watched) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "REPLACE INTO lists (room, title_id, title, year, type_label, image, rating, rotten_tomatoes, added_at, watched) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 room,
                 title_id,
@@ -379,6 +443,7 @@ def api_add() -> Any:
                 data.get("type_label"),
                 data.get("image"),
                 data.get("rating"),
+                data.get("rotten_tomatoes"),
                 int(time.time()),
                 watched,
             ),
