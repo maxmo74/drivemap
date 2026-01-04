@@ -15,6 +15,8 @@ let lastSearchQuery = '';
 let lastSearchResults = [];
 let draggingCard = null;
 let draggingPointerId = null;
+let draggingStartY = 0;
+let draggingOffsetY = 0;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -196,6 +198,8 @@ const onDragMove = (event) => {
   if (!draggingCard) {
     return;
   }
+  draggingOffsetY = event.clientY - draggingStartY;
+  draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
   const target = document.elementFromPoint(event.clientX, event.clientY);
   const targetCard = target ? target.closest('.card') : null;
   if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
@@ -210,9 +214,12 @@ const onDragEnd = async () => {
   if (!draggingCard) {
     return;
   }
+  draggingCard.style.transform = '';
   draggingCard.classList.remove('dragging');
   draggingCard = null;
   draggingPointerId = null;
+  draggingStartY = 0;
+  draggingOffsetY = 0;
   await syncOrder();
 };
 
@@ -228,6 +235,8 @@ const attachDragHandlers = () => {
       }
       draggingCard = card;
       draggingPointerId = event.pointerId;
+      draggingStartY = event.clientY;
+      draggingOffsetY = 0;
       card.classList.add('dragging');
       event.currentTarget.setPointerCapture(event.pointerId);
     });

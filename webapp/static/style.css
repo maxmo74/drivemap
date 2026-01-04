@@ -178,8 +178,11 @@ button.ghost {
 }
 
 .card.dragging {
-  opacity: 0.7;
+  opacity: 0.45;
   border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.45);
+  position: relative;
+  z-index: 2;
 }
 
 .card-actions {
