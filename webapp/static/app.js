@@ -27,6 +27,8 @@ let draggingStartY = 0;
 let draggingOffsetY = 0;
 let isReordering = false;
 let activeDragHandle = null;
+let dragPlaceholder = null;
+let dragOriginRect = null;
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -264,15 +266,12 @@ const onDragMove = (event) => {
   const positions = new Map(cards.map((card) => [card, card.getBoundingClientRect()]));
   const rect = targetCard.getBoundingClientRect();
   const insertBefore = event.clientY < rect.top + rect.height / 2;
-  const previousTop = draggingCard.getBoundingClientRect().top;
-  listResults.insertBefore(draggingCard, insertBefore ? targetCard : targetCard.nextSibling);
-  const nextTop = draggingCard.getBoundingClientRect().top;
-  const topDelta = nextTop - previousTop;
-  if (Math.abs(topDelta) > 0.5) {
-    draggingStartY += topDelta;
+  if (dragPlaceholder) {
+    listResults.insertBefore(
+      dragPlaceholder,
+      insertBefore ? targetCard : targetCard.nextSibling
+    );
   }
-  draggingOffsetY = event.clientY - draggingStartY;
-  draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
   cards.forEach((card) => {
     if (card === draggingCard) {
       return;
@@ -306,11 +305,21 @@ const onDragEnd = async () => {
     card.style.transform = '';
   });
   draggingCard.style.transform = '';
+  draggingCard.style.position = '';
+  draggingCard.style.left = '';
+  draggingCard.style.top = '';
+  draggingCard.style.width = '';
   draggingCard.classList.remove('dragging');
+  if (dragPlaceholder) {
+    listResults.insertBefore(draggingCard, dragPlaceholder);
+    dragPlaceholder.remove();
+    dragPlaceholder = null;
+  }
   draggingCard = null;
   draggingPointerId = null;
   draggingStartY = 0;
   draggingOffsetY = 0;
+  dragOriginRect = null;
   listResults.classList.remove('is-reordering');
   isReordering = false;
   await syncOrder();
@@ -359,11 +368,21 @@ const attachDragHandlers = () => {
       }
       draggingCard = card;
       draggingPointerId = event.pointerId;
+      dragOriginRect = card.getBoundingClientRect();
       draggingStartY = event.clientY;
       draggingOffsetY = 0;
       activeDragHandle = event.currentTarget;
       listResults.classList.add('is-dragging');
       card.classList.add('dragging');
+      dragPlaceholder = document.createElement('div');
+      dragPlaceholder.className = 'card drag-placeholder';
+      dragPlaceholder.style.height = `${dragOriginRect.height}px`;
+      dragPlaceholder.style.width = `${dragOriginRect.width}px`;
+      listResults.insertBefore(dragPlaceholder, card.nextSibling);
+      card.style.position = 'fixed';
+      card.style.left = `${dragOriginRect.left}px`;
+      card.style.top = `${dragOriginRect.top}px`;
+      card.style.width = `${dragOriginRect.width}px`;
       event.currentTarget.setPointerCapture(event.pointerId);
       document.addEventListener('pointermove', onDragMove);
       document.addEventListener('pointerup', onDragPointerUp);

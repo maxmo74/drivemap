@@ -221,9 +221,14 @@ button.ghost {
   opacity: 0.45;
   border-color: rgba(56, 189, 248, 0.6);
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.45);
-  position: relative;
+  position: fixed;
   z-index: 2;
   pointer-events: none;
+}
+
+.card.drag-placeholder {
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.35);
 }
 
 .card-actions {
