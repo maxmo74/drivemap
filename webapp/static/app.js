@@ -162,6 +162,9 @@ const buildCard = (item, mode) => {
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
+    article.setAttribute('draggable', 'true');
+    article.addEventListener('dragstart', onCardDragStart);
+    article.addEventListener('dragend', onCardDragEnd);
     addButton.textContent = item.watched ? '↺' : '✓';
     addButton.setAttribute(
       'aria-label',
@@ -366,27 +369,29 @@ const syncOrder = async () => {
   }
 };
 
+const onCardDragStart = (event) => {
+  if (event.target.closest('.card-action')) {
+    event.preventDefault();
+    return;
+  }
+  dragSource = event.currentTarget;
+  dragSource.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', dragSource.dataset.titleId || '');
+};
+
+const onCardDragEnd = async () => {
+  if (!dragSource) {
+    return;
+  }
+  dragSource.classList.remove('dragging');
+  dragSource = null;
+  await syncOrder();
+};
+
 const attachDragHandlers = () => {
   listResults.querySelectorAll('.card').forEach((card) => {
     card.setAttribute('draggable', 'true');
-    card.addEventListener('dragstart', (event) => {
-      if (!event.target.closest('.card-drag-handle')) {
-        event.preventDefault();
-        return;
-      }
-      dragSource = card;
-      card.classList.add('dragging');
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', card.dataset.titleId || '');
-    });
-    card.addEventListener('dragend', async () => {
-      if (!dragSource) {
-        return;
-      }
-      dragSource.classList.remove('dragging');
-      dragSource = null;
-      await syncOrder();
-    });
   });
 };
 

@@ -17,11 +17,13 @@ DB_PATH = os.path.join(APP_ROOT, "data.sqlite3")
 CACHE_TTL_SECONDS = 60 * 60
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
+OMDB_URL = "https://www.omdbapi.com/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
 APP_VERSION = "1.2.7"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
+OMDB_API_KEY = os.environ.get("OMDB_API_KEY", "thewdb")
 
 app = Flask(__name__)
 
@@ -145,35 +147,23 @@ def _rating_cache_set(
     )
 
 
-def _extract_rotten_tomatoes(payload: dict[str, Any]) -> str | None:
-    def walk(node: Any) -> dict[str, Any] | None:
-        if isinstance(node, dict):
-            if "rottenTomatoes" in node and isinstance(node["rottenTomatoes"], dict):
-                return node["rottenTomatoes"]
-            for value in node.values():
-                found = walk(value)
-                if found:
-                    return found
-        elif isinstance(node, list):
-            for value in node:
-                found = walk(value)
-                if found:
-                    return found
+def _fetch_rotten_tomatoes(title_id: str, user_agent: str) -> str | None:
+    if not OMDB_API_KEY:
         return None
-
-    rotten = walk(payload)
-    if not rotten:
+    response = requests.get(
+        OMDB_URL,
+        params={"i": title_id, "apikey": OMDB_API_KEY},
+        headers={"User-Agent": user_agent},
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("Response") != "True":
         return None
-    for key in ("tMeterScore", "criticScore", "score"):
-        value = rotten.get(key)
-        if value is None:
-            continue
-        if isinstance(value, (int, float)):
-            return f"{int(value)}%"
-        if isinstance(value, str):
-            cleaned = value.strip()
-            if cleaned:
-                return cleaned if cleaned.endswith("%") else f"{cleaned}%"
+    ratings = payload.get("Ratings") or []
+    for rating in ratings:
+        if rating.get("Source") == "Rotten Tomatoes":
+            return rating.get("Value")
     return None
 
 
@@ -191,14 +181,10 @@ def _fetch_ratings(title_id: str, user_agent: str) -> tuple[str | None, str | No
             data = {}
         imdb_rating = data.get("aggregateRating", {}).get("ratingValue")
         imdb_rating = str(imdb_rating) if imdb_rating is not None else None
-    rotten_rating = None
-    next_match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', response.text, re.S)
-    if next_match:
-        try:
-            next_data = json.loads(next_match.group(1))
-            rotten_rating = _extract_rotten_tomatoes(next_data)
-        except json.JSONDecodeError:
-            rotten_rating = None
+    try:
+        rotten_rating = _fetch_rotten_tomatoes(title_id, user_agent)
+    except requests.RequestException:
+        rotten_rating = None
     return imdb_rating, rotten_rating
 
 
