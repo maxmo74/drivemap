@@ -38,13 +38,8 @@ header h1 {
 }
 
 .app-header {
-  align-items: flex-start;
-}
-
-.brand {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .brand-row {
@@ -82,7 +77,22 @@ header h1 {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 0.75rem;
+}
+
+.inline-search {
+  margin-top: 0;
+  flex-wrap: nowrap;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.inline-search input[type="search"] {
+  min-width: 260px;
 }
 
 input[type="search"] {
@@ -292,8 +302,16 @@ button.ghost {
 @media (min-width: 768px) {
   header {
     flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
+  }
+}
+
+@media (max-width: 800px) {
+  .inline-search {
+    flex-wrap: wrap;
+  }
+
+  .inline-search input[type="search"] {
+    min-width: 180px;
   }
 }
 
