@@ -199,10 +199,13 @@ const onDragMove = (event) => {
   if (!draggingCard) {
     return;
   }
+  event.preventDefault();
   draggingOffsetY = event.clientY - draggingStartY;
   draggingCard.style.transform = `translateY(${draggingOffsetY}px)`;
-  const target = document.elementFromPoint(event.clientX, event.clientY);
-  const targetCard = target ? target.closest('.card') : null;
+  const hoveredCards = document.elementsFromPoint(event.clientX, event.clientY);
+  const targetCard = hoveredCards.find(
+    (node) => node.classList?.contains('card') && node !== draggingCard
+  );
   if (!targetCard || targetCard === draggingCard || targetCard.parentElement !== listResults) {
     return;
   }
@@ -268,8 +271,10 @@ const attachDragHandlers = () => {
       draggingPointerId = event.pointerId;
       draggingStartY = event.clientY;
       draggingOffsetY = 0;
+      listResults.classList.add('is-dragging');
       card.classList.add('dragging');
       event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
     });
     handle.addEventListener('pointermove', (event) => {
       if (draggingPointerId !== event.pointerId) {
@@ -282,6 +287,7 @@ const attachDragHandlers = () => {
         return;
       }
       event.currentTarget.releasePointerCapture(event.pointerId);
+      listResults.classList.remove('is-dragging');
       onDragEnd();
     });
     handle.addEventListener('pointercancel', (event) => {
@@ -289,6 +295,7 @@ const attachDragHandlers = () => {
         return;
       }
       event.currentTarget.releasePointerCapture(event.pointerId);
+      listResults.classList.remove('is-dragging');
       onDragEnd();
     });
   });

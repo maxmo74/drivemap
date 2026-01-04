@@ -129,6 +129,11 @@ button.ghost {
   grid-template-columns: 1fr;
 }
 
+.list-grid.is-dragging {
+  touch-action: none;
+  user-select: none;
+}
+
 .card {
   display: flex;
   gap: 0.9rem;
