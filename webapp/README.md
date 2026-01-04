@@ -1,4 +1,4 @@
-# Shared Watchlist Web App
+# Shovo Web App
 
 This folder contains a lightweight Flask app for creating a shared movie/show list that is
 shared by URL (no accounts required).
