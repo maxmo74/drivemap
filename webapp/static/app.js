@@ -363,6 +363,13 @@ const updateRefreshProgress = (state) => {
   }
 };
 
+const stopRefreshPolling = () => {
+  if (refreshPollingTimer) {
+    clearInterval(refreshPollingTimer);
+    refreshPollingTimer = null;
+  }
+};
+
 const pollRefreshStatus = async () => {
   try {
     const response = await fetch(`/api/refresh/status?room=${encodeURIComponent(room)}`);
@@ -373,10 +380,16 @@ const pollRefreshStatus = async () => {
     if (state.refreshing) {
       openRefreshProgressModal();
       updateRefreshProgress(state);
+      if (!refreshPollingTimer) {
+        startRefreshPolling();
+      }
     } else if (refreshProgressModal?.classList.contains('is-visible')) {
       updateRefreshProgress(state);
       setTimeout(closeRefreshProgressModal, 800);
       refreshOwner = false;
+      stopRefreshPolling();
+    } else {
+      stopRefreshPolling();
     }
   } catch (error) {
     // no-op
@@ -384,11 +397,9 @@ const pollRefreshStatus = async () => {
 };
 
 const startRefreshPolling = () => {
-  if (refreshPollingTimer) {
-    clearInterval(refreshPollingTimer);
+  if (!refreshPollingTimer) {
+    refreshPollingTimer = setInterval(pollRefreshStatus, 3000);
   }
-  refreshPollingTimer = setInterval(pollRefreshStatus, 1000);
-  pollRefreshStatus();
 };
 
 const renderSearchResults = (items) => {
@@ -544,7 +555,7 @@ const loadList = async () => {
   if (listPagination) {
     listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
   }
-  startRefreshPolling();
+  pollRefreshStatus();
 };
 
 const fetchTrending = async () => {
@@ -895,35 +906,36 @@ refreshConfirmModal?.addEventListener('click', (event) => {
     closeRefreshConfirmModal();
   }
 });
-refreshConfirmStart?.addEventListener('click', async () => {
-  closeRefreshConfirmModal();
-  refreshOwner = true;
-  openRefreshProgressModal();
-  updateRefreshProgress({ refreshing: true, processed: 0, total: 0 });
-  try {
-    const response = await fetch('/api/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room })
-    });
-    if (!response.ok) {
-      refreshOwner = false;
-      closeRefreshProgressModal();
-      if (response.status === 409) {
-        alert('A database refresh is already in progress.');
-        startRefreshPolling();
+  refreshConfirmStart?.addEventListener('click', async () => {
+    closeRefreshConfirmModal();
+    refreshOwner = true;
+    openRefreshProgressModal();
+    updateRefreshProgress({ refreshing: true, processed: 0, total: 0 });
+    try {
+      const response = await fetch('/api/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room })
+      });
+      if (!response.ok) {
+        refreshOwner = false;
+        closeRefreshProgressModal();
+        if (response.status === 409) {
+          alert('A database refresh is already in progress.');
+          pollRefreshStatus();
+          return;
+        }
+        alert('Unable to refresh database.');
         return;
       }
+      detailCache.clear();
+      startRefreshPolling();
+      pollRefreshStatus();
+    } catch (error) {
+      refreshOwner = false;
+      closeRefreshProgressModal();
       alert('Unable to refresh database.');
-      return;
     }
-    detailCache.clear();
-    startRefreshPolling();
-  } catch (error) {
-    refreshOwner = false;
-    closeRefreshProgressModal();
-    alert('Unable to refresh database.');
-  }
 });
 refreshProgressClose?.addEventListener('click', () => {
   if (refreshOwner) {

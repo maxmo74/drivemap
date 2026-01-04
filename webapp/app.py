@@ -20,7 +20,7 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 OMDB_URL = "https://www.omdbapi.com/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.3.2"
+APP_VERSION = "1.3.3"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
@@ -704,7 +704,7 @@ def api_list() -> Any:
             """
             SELECT * FROM lists
             WHERE room = ? AND watched = ?
-            ORDER BY position ASC, added_at DESC
+            ORDER BY (position IS NULL) ASC, position ASC, added_at DESC
             LIMIT ? OFFSET ?
             """,
             (room, watched_flag, per_page, offset),
@@ -811,7 +811,9 @@ def api_order() -> Any:
             (room, *order),
         ).fetchall()
         position_map = {row["title_id"]: row["position"] for row in rows}
-        sorted_positions = sorted(position_map.values())
+        sorted_positions = sorted(
+            position for position in position_map.values() if position is not None
+        )
         for index, title_id in enumerate(order):
             position = sorted_positions[index] if index < len(sorted_positions) else index + 1
             conn.execute(
