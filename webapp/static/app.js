@@ -3,7 +3,6 @@ const searchInput = document.getElementById('search-input');
 const searchButton = document.getElementById('search-button');
 const searchResults = document.getElementById('search-results');
 const searchModal = document.getElementById('search-modal');
-const searchModalClose = document.getElementById('search-modal-close');
 const trendingResults = document.getElementById('trending-results');
 const trendingModal = document.getElementById('trending-modal');
 const trendingModalClose = document.getElementById('trending-modal-close');
@@ -13,6 +12,7 @@ const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
 const trendingButton = document.getElementById('open-trending');
+const refreshDatabaseButton = document.getElementById('refresh-database');
 const menu = document.querySelector('.menu');
 const roomTagButton = document.getElementById('room-tag-button');
 const renameModal = document.getElementById('rename-modal');
@@ -173,15 +173,24 @@ const buildMetaText = (item) => {
 const buildRatingHtml = (item) => {
   const imdbRating = item.rating || 'N/A';
   const rottenRating = item.rotten_tomatoes || 'N/A';
+  const imdbUrl = `https://www.imdb.com/title/${item.title_id}/`;
+  const searchQuery = encodeURIComponent(
+    item.year ? `${item.title} ${item.year}` : item.title
+  );
+  const rottenUrl = `https://www.rottentomatoes.com/search?search=${searchQuery}`;
   return `
-    <span class="rating-badge">
-      <img src="/static/imdb-logo.svg" alt="IMDb" />
-      <span>${imdbRating}</span>
-    </span>
-    <span class="rating-badge">
-      <img src="/static/rotten-tomatoes.svg" alt="Rotten Tomatoes" />
-      <span>${rottenRating}</span>
-    </span>
+    <a class="rating-link" href="${imdbUrl}" target="_blank" rel="noopener noreferrer">
+      <span class="rating-badge">
+        <img src="/static/imdb-logo.svg" alt="IMDb" />
+        <span>${imdbRating}</span>
+      </span>
+    </a>
+    <a class="rating-link" href="${rottenUrl}" target="_blank" rel="noopener noreferrer">
+      <span class="rating-badge">
+        <img src="/static/rotten-tomatoes.svg" alt="Rotten Tomatoes" />
+        <span>${rottenRating}</span>
+      </span>
+    </a>
   `;
 };
 
@@ -666,12 +675,6 @@ searchInput.addEventListener('keydown', (event) => {
     fetchSearch();
   }
 });
-searchModalClose?.addEventListener('click', closeSearchModal);
-searchModal?.addEventListener('click', (event) => {
-  if (event.target === searchModal) {
-    closeSearchModal();
-  }
-});
 trendingModalClose?.addEventListener('click', closeTrendingModal);
 trendingModal?.addEventListener('click', (event) => {
   if (event.target === trendingModal) {
@@ -688,6 +691,19 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && imageModal?.classList.contains('is-visible')) {
     closeImageModal();
   }
+});
+document.addEventListener('click', (event) => {
+  if (!searchModal?.classList.contains('is-visible')) {
+    return;
+  }
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    (searchModal.contains(target) || searchInput.contains(target) || searchButton.contains(target))
+  ) {
+    return;
+  }
+  closeSearchModal();
 });
 imageModalClose?.addEventListener('click', closeImageModal);
 imageModal?.addEventListener('click', (event) => {
@@ -726,6 +742,25 @@ if (changeListButton) {
       menu.removeAttribute('open');
     }
     fetchTrending();
+  });
+  refreshDatabaseButton?.addEventListener('click', async () => {
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    if (!confirm('Refresh metadata and scores for this list?')) {
+      return;
+    }
+    const response = await fetch('/api/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room })
+    });
+    if (!response.ok) {
+      alert('Unable to refresh database.');
+      return;
+    }
+    detailCache.clear();
+    await loadList();
   });
 
   renameModalCancel?.addEventListener('click', closeRenameModal);

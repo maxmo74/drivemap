@@ -355,6 +355,33 @@ def _normalize_type_label(type_label: str | None) -> str:
     return re.sub(r"[^a-z]", "", type_label.lower())
 
 
+def _refresh_title_details(
+    conn: sqlite3.Connection, title_id: str, user_agent: str, normalized_type: str
+) -> tuple[str | None, str | None, int | None, int | None, int | None, int | None]:
+    try:
+        imdb_rating, rotten_rating = _fetch_ratings(title_id, user_agent)
+    except requests.RequestException:
+        imdb_rating, rotten_rating = None, None
+    try:
+        runtime_minutes, total_seasons, total_episodes, avg_episode_length = _fetch_metadata(
+            title_id, user_agent, normalized_type
+        )
+    except requests.RequestException:
+        runtime_minutes = total_seasons = total_episodes = avg_episode_length = None
+    _rating_cache_set(conn, title_id, imdb_rating, rotten_rating)
+    _metadata_cache_set(
+        conn, title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length
+    )
+    return (
+        imdb_rating,
+        rotten_rating,
+        runtime_minutes,
+        total_seasons,
+        total_episodes,
+        avg_episode_length,
+    )
+
+
 def parse_suggestion_item(
     item: dict[str, Any], user_agent: str, include_details: bool = True
 ) -> SearchResult | None:
@@ -555,6 +582,56 @@ def api_details() -> Any:
             "avg_episode_length": avg_episode_length,
         }
     )
+
+
+@app.route("/api/refresh", methods=["POST"])
+def api_refresh() -> Any:
+    if not request.is_json:
+        return jsonify({"error": "invalid_payload"}), 400
+    room = _room_from_request()
+    if not room:
+        return jsonify({"error": "missing_room"}), 400
+    user_agent = _request_user_agent()
+    with _get_db() as conn:
+        _migrate_db(conn)
+        rows = conn.execute(
+            "SELECT title_id, type_label FROM lists WHERE room = ?",
+            (room,),
+        ).fetchall()
+        for row in rows:
+            title_id = row["title_id"]
+            type_label = row["type_label"]
+            normalized_type = _normalize_type_label(type_label)
+            if normalized_type not in ALLOWED_TYPE_LABELS:
+                normalized_type = "movie"
+            (
+                imdb_rating,
+                rotten_rating,
+                runtime_minutes,
+                total_seasons,
+                total_episodes,
+                avg_episode_length,
+            ) = _refresh_title_details(conn, title_id, user_agent, normalized_type)
+            conn.execute(
+                """
+                UPDATE lists
+                SET rating = ?, rotten_tomatoes = ?, runtime_minutes = ?, total_seasons = ?,
+                    total_episodes = ?, avg_episode_length = ?
+                WHERE room = ? AND title_id = ?
+                """,
+                (
+                    imdb_rating,
+                    rotten_rating,
+                    runtime_minutes,
+                    total_seasons,
+                    total_episodes,
+                    avg_episode_length,
+                    room,
+                    title_id,
+                ),
+            )
+        conn.commit()
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/trending")
