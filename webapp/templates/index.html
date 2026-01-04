@@ -9,38 +9,39 @@
   <body>
     <main>
       <header class="app-header">
-        <div class="brand">
-          <div class="brand-row">
-            <h1>Shovo</h1>
-            <div class="room-tag">
-              <span>List ID</span>
-              <strong id="room-id">{{ room }}</strong>
-            </div>
-          </div>
+        <div class="brand-row">
+          <h1>Shovo</h1>
+          <button class="room-tag" id="room-tag-button" type="button">
+            <span>List</span>
+            <strong id="room-id">{{ room }}</strong>
+          </button>
         </div>
-        <details class="menu">
-          <summary aria-label="Open menu">
-            <span></span>
-            <span></span>
-            <span></span>
-          </summary>
-          <div class="menu-panel">
-            <div class="menu-item">
-              <span>Version</span>
-              <strong id="app-version">{{ app_version }}</strong>
-            </div>
-            <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
+        <div class="header-actions">
+          <div class="search-row inline-search">
+            <input id="search-input" type="search" placeholder="Search for a movie or show" />
+            <button class="clear-search" id="clear-search" type="button" aria-label="Clear search">
+              ×
+            </button>
+            <button id="search-button">Search</button>
           </div>
-        </details>
+          <details class="menu">
+            <summary aria-label="Open menu">
+              <span></span>
+              <span></span>
+              <span></span>
+            </summary>
+            <div class="menu-panel">
+              <div class="menu-item">
+                <span>Version</span>
+                <strong id="app-version">{{ app_version }}</strong>
+              </div>
+              <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
+            </div>
+          </details>
+        </div>
       </header>
 
       <section class="search-panel">
-        <label for="search-input">Search IMDB</label>
-        <div class="search-row">
-          <input id="search-input" type="search" placeholder="Search for a movie or show" />
-          <button class="clear-search" id="clear-search" type="button" aria-label="Clear search">×</button>
-          <button id="search-button">Search</button>
-        </div>
         <div id="search-results" class="results-grid" aria-live="polite"></div>
       </section>
 
@@ -76,6 +77,23 @@
         </div>
       </article>
     </template>
+
+    <div class="modal-overlay" id="rename-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Rename List ID</h2>
+          <button class="icon-button" id="rename-modal-close" type="button" aria-label="Close rename prompt">
+            ×
+          </button>
+        </div>
+        <p class="modal-subtitle">Pick a new identifier to share this list.</p>
+        <input id="rename-modal-input" type="text" autocomplete="off" />
+        <div class="modal-actions">
+          <button class="ghost" id="rename-modal-cancel" type="button">Cancel</button>
+          <button id="rename-modal-confirm" type="button">Save</button>
+        </div>
+      </div>
+    </div>
 
     <script>
       window.APP_ROOM = "{{ room }}";
