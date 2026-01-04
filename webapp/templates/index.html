@@ -30,6 +30,7 @@
               </div>
               <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
               <button class="menu-action" id="open-trending" type="button">Trending</button>
+              <button class="menu-action" id="refresh-database" type="button">Refresh Database</button>
             </div>
           </details>
         </div>
@@ -41,14 +42,22 @@
             <button id="tab-watchlist" class="tab active" role="tab">Watchlist</button>
             <button id="tab-watched" class="tab" role="tab">Watched</button>
           </div>
-          <div class="search-row inline-search">
+          <div class="search-row inline-search search-container">
             <input id="search-input" type="search" placeholder="Search for a movie or show" />
             <button id="search-button" class="icon-button search-submit" type="button" aria-label="Search">
               🔍
             </button>
+            <div id="search-modal" class="search-popover" aria-hidden="true">
+              <div id="search-results" class="results-grid" aria-live="polite"></div>
+            </div>
           </div>
         </div>
         <div id="list-results" class="list-grid"></div>
+        <div class="pagination" id="list-pagination">
+          <button class="pagination-button" id="list-prev" type="button">Prev</button>
+          <span class="pagination-status" id="list-page-status">Page 1 of 1</span>
+          <button class="pagination-button" id="list-next" type="button">Next</button>
+        </div>
       </section>
     </main>
 
@@ -62,15 +71,15 @@
                 <a class="card-title-link" target="_blank" rel="noopener noreferrer"></a>
               </h3>
             </div>
-            <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
+            <div class="card-row-actions">
+              <button class="card-action primary">Add</button>
+              <button class="card-action secondary">Watched</button>
+              <button class="card-action danger">Remove</button>
+              <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
+            </div>
           </div>
           <p class="card-meta"></p>
           <p class="card-rating"></p>
-          <div class="card-actions">
-            <button class="card-action primary">Add</button>
-            <button class="card-action secondary">Watched</button>
-            <button class="card-action danger">Remove</button>
-          </div>
         </div>
       </article>
     </template>
@@ -91,14 +100,34 @@
       </div>
     </div>
 
-    <div class="modal-overlay" id="search-modal" aria-hidden="true" role="dialog" aria-modal="true">
-      <div class="modal search-modal">
+    <div class="modal-overlay" id="refresh-confirm-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal">
         <div class="modal-header modal-header--compact">
-          <button class="icon-button" id="search-modal-close" type="button" aria-label="Close search">
+          <button class="icon-button" id="refresh-confirm-close" type="button" aria-label="Close refresh prompt">
             ×
           </button>
         </div>
-        <div id="search-results" class="results-grid" aria-live="polite"></div>
+        <p class="modal-subtitle">Refresh Database</p>
+        <p class="modal-body">
+          This will refresh ratings and metadata for this list. Continue?
+        </p>
+        <div class="modal-actions">
+          <button class="ghost" id="refresh-confirm-cancel" type="button">Cancel</button>
+          <button id="refresh-confirm-start" type="button">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="refresh-progress-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="modal-header modal-header--compact">
+          <button class="icon-button" id="refresh-progress-close" type="button" aria-label="Close refresh status">
+            ×
+          </button>
+        </div>
+        <p class="modal-subtitle" id="refresh-progress-title">Refreshing database…</p>
+        <progress id="refresh-progress-bar" value="0" max="100"></progress>
+        <p class="modal-body" id="refresh-progress-text">Preparing refresh…</p>
       </div>
     </div>
 

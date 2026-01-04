@@ -96,6 +96,11 @@ header h1 {
   flex-wrap: nowrap;
 }
 
+.search-container {
+  position: relative;
+  align-items: stretch;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -142,22 +147,68 @@ button.ghost {
   grid-template-columns: 1fr;
 }
 
-.results-grid {
+.list-grid {
+  grid-template-columns: 1fr;
+}
+
+.list-grid {
+  grid-template-columns: 1fr;
+}
+
+.search-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  background: #0b1120;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.4);
+  padding: 0.5rem;
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  z-index: 6;
 }
 
-.results-grid .card {
-  min-height: 120px;
+.search-popover.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
-.list-grid {
-  grid-template-columns: 1fr;
+.search-popover .results-grid {
+  margin-top: 0;
+  max-height: none;
+  padding-right: 0;
 }
 
-.list-grid {
-  grid-template-columns: 1fr;
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.pagination-button {
+  background: rgba(56, 189, 248, 0.2);
+  color: #e2e8f0;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  min-width: 80px;
+}
+
+.pagination-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-status {
+  font-size: 0.85rem;
+  color: #94a3b8;
 }
 
 .list-grid.is-reordering .card {
@@ -187,7 +238,7 @@ button.ghost {
 }
 
 .card-body {
-  padding: 0.5rem 0.65rem 0.5rem 0;
+  padding: 0.4rem 0.5rem 0.45rem 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -251,6 +302,12 @@ button.ghost {
   flex-wrap: wrap;
 }
 
+.card-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .card-drag-handle {
   background: rgba(148, 163, 184, 0.2);
   color: #e2e8f0;
@@ -277,21 +334,12 @@ button.ghost {
   background: rgba(15, 23, 42, 0.35);
 }
 
-.card-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  margin-top: auto;
-  align-self: flex-end;
-  justify-content: flex-end;
-}
-
 .card-action {
-  flex: 1 1 auto;
-  min-width: 48px;
-  padding: 0.45rem 0.6rem;
-  font-size: 0.95rem;
-  line-height: 1;
+  min-width: 32px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  border-radius: var(--radius);
 }
 
 .card-action.secondary {
@@ -304,6 +352,24 @@ button.ghost {
   background: rgba(248, 113, 113, 0.2);
   color: #fca5a5;
   border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.card-action.primary {
+  background: rgba(56, 189, 248, 0.2);
+  color: #e2e8f0;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+}
+
+.rating-link {
+  color: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rating-link:hover {
+  text-decoration: underline;
 }
 
 
@@ -497,12 +563,34 @@ button.ghost {
   font-size: 0.9rem;
 }
 
+.modal-body {
+  margin: 0;
+  color: #cbd5f5;
+  font-size: 0.9rem;
+}
+
 .modal input {
   padding: 0.75rem 1rem;
   border-radius: var(--radius);
   border: 1px solid rgba(148, 163, 184, 0.3);
   background: #0f172a;
   color: #e2e8f0;
+}
+
+.modal progress {
+  width: 100%;
+  height: 0.65rem;
+  appearance: none;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.modal progress::-webkit-progress-bar {
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.modal progress::-webkit-progress-value {
+  background: #38bdf8;
 }
 
 .modal-actions {
