@@ -92,12 +92,12 @@ header h1 {
 }
 
 .list-panel {
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .search-row {
@@ -266,7 +266,7 @@ button.ghost {
   min-width: 62px;
   height: 100%;
   align-self: stretch;
-  object-fit: contain;
+  object-fit: cover;
   background: #0f172a;
   cursor: zoom-in;
 }
@@ -372,12 +372,17 @@ button.ghost {
 }
 
 .card-action {
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   line-height: 1.2;
   border-radius: var(--radius);
+}
+
+.card-action-top {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .card-action.neutral {
@@ -474,10 +479,8 @@ button.ghost {
   }
 
   .brand-row {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -735,8 +738,9 @@ button.ghost {
   }
 
   .card-action {
-    min-width: 40px;
-    padding: 0.3rem 0.45rem;
-    font-size: 0.8rem;
+    min-width: 32px;
+    height: 32px;
+    padding: 0.2rem 0.35rem;
+    font-size: 0.75rem;
   }
 }

@@ -234,7 +234,7 @@ const buildRatingHtml = (item) => {
   const imdbRating = item.rating || 'N/A';
   const normalizedType = normalizeTypeLabel(item.type_label);
   const isSeries = normalizedType === 'tvseries' || normalizedType === 'tvminiseries';
-  const rottenRating = item.rotten_tomatoes || (isSeries ? 'Search' : 'N/A');
+  const rottenRating = item.rotten_tomatoes || 'N/A';
   const imdbUrl = `https://www.imdb.com/title/${item.title_id}/`;
   const searchQuery = encodeURIComponent(
     isSeries ? item.title : item.year ? `${item.title} ${item.year}` : item.title
