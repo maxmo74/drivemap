@@ -2,8 +2,8 @@
   color-scheme: dark;
   font-family: "Inter", "SF Pro Display", system-ui, sans-serif;
   color: #e2e8f0;
-  --radius: 1.1rem;
-  --radius-pill: 999px;
+  --radius: 0.45rem;
+  --radius-pill: var(--radius);
   --bg: #070b14;
   --surface: rgba(15, 23, 42, 0.8);
   --surface-strong: rgba(15, 23, 42, 0.95);
@@ -188,7 +188,7 @@ button.ghost {
   right: 0;
   background: var(--surface-strong);
   border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: calc(var(--radius) - 0.2rem);
+  border-radius: var(--radius);
   box-shadow: 0 18px 40px rgba(2, 8, 23, 0.6);
   padding: 0.6rem;
   max-height: 60vh;
@@ -246,7 +246,7 @@ button.ghost {
   gap: 0.7rem;
   background: rgba(8, 15, 28, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: calc(var(--radius) - 0.2rem);
+  border-radius: var(--radius);
   overflow: hidden;
   transition: border 150ms ease, transform 150ms ease;
 }
@@ -374,6 +374,12 @@ button.ghost {
   border-radius: var(--radius);
 }
 
+.card-action.neutral {
+  background: rgba(148, 163, 184, 0.14);
+  color: inherit;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
 .card-action.secondary {
   background: rgba(56, 189, 248, 0.18);
   color: inherit;
@@ -446,17 +452,26 @@ button.ghost {
 
 @media (max-width: 768px) {
   header {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
   }
 
   .app-header {
-    align-items: flex-start;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
   .header-actions {
     margin-left: auto;
     width: auto;
     justify-content: flex-end;
+  }
+
+  .brand-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
   }
 }
 
