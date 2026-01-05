@@ -56,6 +56,7 @@ const pendingDetailRequests = new Set();
 const detailCache = new Map();
 let refreshPollingTimer;
 let refreshOwner = false;
+const preloadedTabs = new Set();
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -168,6 +169,22 @@ const normalizeTypeLabel = (typeLabel) =>
     .toLowerCase()
     .replace(/[^a-z]/g, '');
 
+const buildRottenTomatoesSlug = (title) =>
+  (title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const buildRottenTomatoesUrl = (item) => {
+  const slug = buildRottenTomatoesSlug(item.title);
+  if (!slug) {
+    return '';
+  }
+  const normalizedType = normalizeTypeLabel(item.type_label);
+  const basePath = normalizedType === 'tvseries' || normalizedType === 'tvminiseries' ? 'tv' : 'm';
+  return `https://www.rottentomatoes.com/${basePath}/${slug}`;
+};
+
 const buildMetaText = (item) => {
   const normalizedType = normalizeTypeLabel(item.type_label);
   const labelMap = {
@@ -210,7 +227,7 @@ const buildMetaText = (item) => {
       metaParts.push(`Avg ${avgEpisodeLength} min`);
     }
   }
-  return metaParts.join(' • ') || 'Unknown';
+  return metaParts.join(' . ') || 'Unknown';
 };
 
 const buildRatingHtml = (item) => {
@@ -222,7 +239,7 @@ const buildRatingHtml = (item) => {
   const searchQuery = encodeURIComponent(
     isSeries ? item.title : item.year ? `${item.title} ${item.year}` : item.title
   );
-  const rottenUrl = `https://www.rottentomatoes.com/search?search=${searchQuery}`;
+  const rottenUrl = buildRottenTomatoesUrl(item) || `https://www.rottentomatoes.com/search?search=${searchQuery}`;
   return `
     <a class="rating-link" href="${imdbUrl}" target="_blank" rel="noopener noreferrer">
       <span class="rating-badge">
@@ -257,6 +274,7 @@ const buildCard = (item, mode) => {
   const title = fragment.querySelector('.card-title-link');
   const addButton = fragment.querySelector('.card-action.primary');
   const watchedButton = fragment.querySelector('.card-action.secondary');
+  const moveTopButton = fragment.querySelector('.card-action-top');
   const removeButton = fragment.querySelector('.card-action.danger');
   const dragHandle = fragment.querySelector('.card-drag-handle');
 
@@ -280,6 +298,7 @@ const buildCard = (item, mode) => {
     watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
+    moveTopButton?.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
@@ -295,6 +314,7 @@ const buildCard = (item, mode) => {
     removeButton.title = 'Remove';
     addButton.addEventListener('click', () => toggleWatched(item));
     removeButton.addEventListener('click', () => removeFromList(item));
+    moveTopButton?.addEventListener('click', () => moveItemToTop(article));
   }
 
   return article;
@@ -557,7 +577,32 @@ const loadList = async () => {
   if (listPagination) {
     listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
   }
+  preloadTabImages(activeTab === 'watched' ? 'unwatched' : 'watched');
   pollRefreshStatus();
+};
+
+const preloadTabImages = async (tab) => {
+  if (!tab || preloadedTabs.has(tab)) {
+    return;
+  }
+  preloadedTabs.add(tab);
+  try {
+    const response = await fetch(
+      `/api/list?room=${encodeURIComponent(room)}&status=${tab}&page=1&per_page=${PAGE_SIZE}`
+    );
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    (data.items || []).forEach((item) => {
+      if (item.image) {
+        const img = new Image();
+        img.src = item.image;
+      }
+    });
+  } catch (error) {
+    // no-op
+  }
 };
 
 const fetchTrending = async () => {
@@ -615,6 +660,14 @@ const syncOrder = async () => {
   if (!response.ok) {
     alert('Failed to save order.');
   }
+};
+
+const moveItemToTop = async (card) => {
+  if (!card || !listResults) {
+    return;
+  }
+  listResults.prepend(card);
+  await syncOrder();
 };
 
 const getDragAfterElement = (container, y) => {
