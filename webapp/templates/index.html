@@ -25,12 +25,11 @@
             </summary>
             <div class="menu-panel">
               <div class="menu-item">
-                <span>Version</span>
-                <strong id="app-version">{{ app_version }}</strong>
+                <strong class="menu-version" id="app-version">Shovo v{{ app_version }}</strong>
               </div>
               <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
               <button class="menu-action" id="refresh-database" type="button">Refresh Database</button>
-              <button class="menu-action" id="open-gpl" type="button">GPL v3</button>
+              <button class="menu-action" id="open-about" type="button">About</button>
             </div>
           </details>
         </div>
@@ -151,22 +150,27 @@
       </div>
     </div>
 
-    <div class="modal-overlay" id="gpl-modal" aria-hidden="true" role="dialog" aria-modal="true">
-      <div class="modal gpl-modal">
+    <div class="modal-overlay" id="about-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal about-modal">
         <div class="modal-header modal-header--compact">
-          <button class="icon-button" id="gpl-modal-close" type="button" aria-label="Close GPL v3">
+          <button class="icon-button" id="about-modal-close" type="button" aria-label="Close about">
             ×
           </button>
         </div>
-        <p class="modal-subtitle">GNU GPL v3</p>
-        <a class="gpl-link" href="https://www.gnu.org/licenses/gpl-3.0.txt" target="_blank" rel="noopener noreferrer">
-          View full GPL v3 text
-        </a>
-        <iframe
-          class="gpl-frame"
-          title="GNU GPL v3 license text"
-          src="https://www.gnu.org/licenses/gpl-3.0.txt"
-        ></iframe>
+        <p class="modal-subtitle">About Shovo</p>
+        <div class="about-details">
+          <p>Version: <strong>Shovo v{{ app_version }}</strong></p>
+          <p>Author: <strong>Shovo creator</strong></p>
+          <p>Copyright © 2025</p>
+        </div>
+        <div class="about-links">
+          <a class="gpl-link" href="/static/gpl-3.0.txt" target="_blank" rel="noopener noreferrer">
+            View GPL v3 license
+          </a>
+          <a class="gpl-link" href="https://www.gnu.org/licenses/gpl-3.0.txt" target="_blank" rel="noopener noreferrer">
+            GPL v3 on gnu.org
+          </a>
+        </div>
       </div>
     </div>
 
