@@ -257,6 +257,7 @@ const buildCard = (item, mode) => {
   const title = fragment.querySelector('.card-title-link');
   const addButton = fragment.querySelector('.card-action.primary');
   const watchedButton = fragment.querySelector('.card-action.secondary');
+  const moveTopButton = fragment.querySelector('.card-action-top');
   const removeButton = fragment.querySelector('.card-action.danger');
   const dragHandle = fragment.querySelector('.card-drag-handle');
 
@@ -280,6 +281,7 @@ const buildCard = (item, mode) => {
     watchedButton.title = 'Add as watched';
     removeButton.remove();
     dragHandle.remove();
+    moveTopButton?.remove();
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
@@ -295,6 +297,7 @@ const buildCard = (item, mode) => {
     removeButton.title = 'Remove';
     addButton.addEventListener('click', () => toggleWatched(item));
     removeButton.addEventListener('click', () => removeFromList(item));
+    moveTopButton?.addEventListener('click', () => moveItemToTop(article));
   }
 
   return article;
@@ -615,6 +618,14 @@ const syncOrder = async () => {
   if (!response.ok) {
     alert('Failed to save order.');
   }
+};
+
+const moveItemToTop = async (card) => {
+  if (!card || !listResults) {
+    return;
+  }
+  listResults.prepend(card);
+  await syncOrder();
 };
 
 const getDragAfterElement = (container, y) => {
