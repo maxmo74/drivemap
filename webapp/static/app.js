@@ -34,6 +34,7 @@ const imageModalImage = document.getElementById('image-modal-image');
 const aboutModal = document.getElementById('about-modal');
 const aboutModalClose = document.getElementById('about-modal-close');
 const aboutOpenButton = document.getElementById('open-about');
+const aboutVersionButton = document.getElementById('app-version-corner');
 const listPagination = document.getElementById('list-pagination');
 const listPrev = document.getElementById('list-prev');
 const listNext = document.getElementById('list-next');
@@ -944,6 +945,7 @@ if (changeListButton) {
     }
     openAboutModal();
   });
+  aboutVersionButton?.addEventListener('click', openAboutModal);
 
   renameModalCancel?.addEventListener('click', closeRenameModal);
   renameModalClose?.addEventListener('click', closeRenameModal);

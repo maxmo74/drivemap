@@ -10,7 +10,13 @@
     <main>
       <header class="app-header">
         <div class="brand-row">
-          <h1 class="logo"><span class="logo-s">S</span>hovo</h1>
+          <h1 class="logo">
+            <span class="logo-mark">
+              <span class="logo-s">S</span>
+              <span class="logo-h">h</span>
+            </span>
+            <span class="logo-text">ovo</span>
+          </h1>
           <button class="room-tag room-link" id="room-tag-button" type="button">
             <span class="room-label">List:</span>
             <span class="room-name" id="room-id">{{ room }}</span>
@@ -174,7 +180,9 @@
       </div>
     </div>
 
-    <div class="app-version-corner">Shovo v{{ app_version }}</div>
+    <button class="app-version-corner" id="app-version-corner" type="button">
+      Shovo v{{ app_version }}
+    </button>
 
     <script>
       window.APP_ROOM = "{{ room }}";
