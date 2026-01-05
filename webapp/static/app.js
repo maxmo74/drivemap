@@ -168,6 +168,22 @@ const normalizeTypeLabel = (typeLabel) =>
     .toLowerCase()
     .replace(/[^a-z]/g, '');
 
+const buildRottenTomatoesSlug = (title) =>
+  (title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const buildRottenTomatoesUrl = (item) => {
+  const slug = buildRottenTomatoesSlug(item.title);
+  if (!slug) {
+    return '';
+  }
+  const normalizedType = normalizeTypeLabel(item.type_label);
+  const basePath = normalizedType === 'tvseries' || normalizedType === 'tvminiseries' ? 'tv' : 'm';
+  return `https://www.rottentomatoes.com/${basePath}/${slug}`;
+};
+
 const buildMetaText = (item) => {
   const normalizedType = normalizeTypeLabel(item.type_label);
   const labelMap = {
@@ -210,7 +226,7 @@ const buildMetaText = (item) => {
       metaParts.push(`Avg ${avgEpisodeLength} min`);
     }
   }
-  return metaParts.join(' • ') || 'Unknown';
+  return metaParts.join(' . ') || 'Unknown';
 };
 
 const buildRatingHtml = (item) => {
@@ -222,7 +238,7 @@ const buildRatingHtml = (item) => {
   const searchQuery = encodeURIComponent(
     isSeries ? item.title : item.year ? `${item.title} ${item.year}` : item.title
   );
-  const rottenUrl = `https://www.rottentomatoes.com/search?search=${searchQuery}`;
+  const rottenUrl = buildRottenTomatoesUrl(item) || `https://www.rottentomatoes.com/search?search=${searchQuery}`;
   return `
     <a class="rating-link" href="${imdbUrl}" target="_blank" rel="noopener noreferrer">
       <span class="rating-badge">
