@@ -31,9 +31,9 @@ const refreshProgressText = document.getElementById('refresh-progress-text');
 const imageModal = document.getElementById('image-modal');
 const imageModalClose = document.getElementById('image-modal-close');
 const imageModalImage = document.getElementById('image-modal-image');
-const gplModal = document.getElementById('gpl-modal');
-const gplModalClose = document.getElementById('gpl-modal-close');
-const gplOpenButton = document.getElementById('open-gpl');
+const aboutModal = document.getElementById('about-modal');
+const aboutModalClose = document.getElementById('about-modal-close');
+const aboutOpenButton = document.getElementById('open-about');
 const listPagination = document.getElementById('list-pagination');
 const listPrev = document.getElementById('list-prev');
 const listNext = document.getElementById('list-next');
@@ -96,20 +96,20 @@ const closeImageModal = () => {
   }
 };
 
-const openGplModal = () => {
-  if (!gplModal) {
+const openAboutModal = () => {
+  if (!aboutModal) {
     return;
   }
-  gplModal.classList.add('is-visible');
-  gplModal.setAttribute('aria-hidden', 'false');
+  aboutModal.classList.add('is-visible');
+  aboutModal.setAttribute('aria-hidden', 'false');
 };
 
-const closeGplModal = () => {
-  if (!gplModal) {
+const closeAboutModal = () => {
+  if (!aboutModal) {
     return;
   }
-  gplModal.classList.remove('is-visible');
-  gplModal.setAttribute('aria-hidden', 'true');
+  aboutModal.classList.remove('is-visible');
+  aboutModal.setAttribute('aria-hidden', 'true');
 };
 
 const openSearchModal = () => {
@@ -321,6 +321,7 @@ const buildCard = (item, mode) => {
     addButton.addEventListener('click', () => addToList(item, false, article));
     watchedButton.addEventListener('click', () => addToList(item, true, article));
   } else {
+    addButton.classList.add('watched-toggle');
     addButton.textContent = item.watched ? '↺' : '✓';
     addButton.setAttribute(
       'aria-label',
@@ -866,8 +867,8 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && imageModal?.classList.contains('is-visible')) {
     closeImageModal();
   }
-  if (event.key === 'Escape' && gplModal?.classList.contains('is-visible')) {
-    closeGplModal();
+  if (event.key === 'Escape' && aboutModal?.classList.contains('is-visible')) {
+    closeAboutModal();
   }
 });
 document.addEventListener('click', (event) => {
@@ -891,13 +892,13 @@ imageModal?.addEventListener('click', (event) => {
     closeImageModal();
   }
 });
-gplModalClose?.addEventListener('click', closeGplModal);
-gplModal?.addEventListener('click', (event) => {
-  if (event.target === gplModal) {
-    closeGplModal();
+aboutModalClose?.addEventListener('click', closeAboutModal);
+aboutModal?.addEventListener('click', (event) => {
+  if (event.target === aboutModal) {
+    closeAboutModal();
   }
 });
-  if (changeListButton) {
+if (changeListButton) {
   const closeRenameModal = () => {
     if (!renameModal) {
       return;
@@ -937,11 +938,11 @@ gplModal?.addEventListener('click', (event) => {
     }
     openRefreshConfirmModal();
   });
-  gplOpenButton?.addEventListener('click', () => {
+  aboutOpenButton?.addEventListener('click', () => {
     if (menu?.hasAttribute('open')) {
       menu.removeAttribute('open');
     }
-    openGplModal();
+    openAboutModal();
   });
 
   renameModalCancel?.addEventListener('click', closeRenameModal);
@@ -993,36 +994,36 @@ refreshConfirmModal?.addEventListener('click', (event) => {
     closeRefreshConfirmModal();
   }
 });
-  refreshConfirmStart?.addEventListener('click', async () => {
-    closeRefreshConfirmModal();
-    refreshOwner = true;
-    openRefreshProgressModal();
-    updateRefreshProgress({ refreshing: true, processed: 0, total: 0 });
-    try {
-      const response = await fetch('/api/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room })
-      });
-      if (!response.ok) {
-        refreshOwner = false;
-        closeRefreshProgressModal();
-        if (response.status === 409) {
-          alert('A database refresh is already in progress.');
-          pollRefreshStatus();
-          return;
-        }
-        alert('Unable to refresh database.');
-        return;
-      }
-      detailCache.clear();
-      startRefreshPolling();
-      pollRefreshStatus();
-    } catch (error) {
+refreshConfirmStart?.addEventListener('click', async () => {
+  closeRefreshConfirmModal();
+  refreshOwner = true;
+  openRefreshProgressModal();
+  updateRefreshProgress({ refreshing: true, processed: 0, total: 0 });
+  try {
+    const response = await fetch('/api/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room })
+    });
+    if (!response.ok) {
       refreshOwner = false;
       closeRefreshProgressModal();
+      if (response.status === 409) {
+        alert('A database refresh is already in progress.');
+        pollRefreshStatus();
+        return;
+      }
       alert('Unable to refresh database.');
+      return;
     }
+    detailCache.clear();
+    startRefreshPolling();
+    pollRefreshStatus();
+  } catch (error) {
+    refreshOwner = false;
+    closeRefreshProgressModal();
+    alert('Unable to refresh database.');
+  }
 });
 refreshProgressClose?.addEventListener('click', () => {
   if (refreshOwner) {
