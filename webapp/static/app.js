@@ -31,6 +31,9 @@ const refreshProgressText = document.getElementById('refresh-progress-text');
 const imageModal = document.getElementById('image-modal');
 const imageModalClose = document.getElementById('image-modal-close');
 const imageModalImage = document.getElementById('image-modal-image');
+const gplModal = document.getElementById('gpl-modal');
+const gplModalClose = document.getElementById('gpl-modal-close');
+const gplOpenButton = document.getElementById('open-gpl');
 const listPagination = document.getElementById('list-pagination');
 const listPrev = document.getElementById('list-prev');
 const listNext = document.getElementById('list-next');
@@ -91,6 +94,22 @@ const closeImageModal = () => {
   if (imageModalImage) {
     imageModalImage.src = '';
   }
+};
+
+const openGplModal = () => {
+  if (!gplModal) {
+    return;
+  }
+  gplModal.classList.add('is-visible');
+  gplModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeGplModal = () => {
+  if (!gplModal) {
+    return;
+  }
+  gplModal.classList.remove('is-visible');
+  gplModal.setAttribute('aria-hidden', 'true');
 };
 
 const openSearchModal = () => {
@@ -234,7 +253,7 @@ const buildRatingHtml = (item) => {
   const imdbRating = item.rating || 'N/A';
   const normalizedType = normalizeTypeLabel(item.type_label);
   const isSeries = normalizedType === 'tvseries' || normalizedType === 'tvminiseries';
-  const rottenRating = item.rotten_tomatoes || (isSeries ? 'Search' : 'N/A');
+  const rottenRating = item.rotten_tomatoes || 'N/A';
   const imdbUrl = `https://www.imdb.com/title/${item.title_id}/`;
   const searchQuery = encodeURIComponent(
     isSeries ? item.title : item.year ? `${item.title} ${item.year}` : item.title
@@ -847,6 +866,9 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && imageModal?.classList.contains('is-visible')) {
     closeImageModal();
   }
+  if (event.key === 'Escape' && gplModal?.classList.contains('is-visible')) {
+    closeGplModal();
+  }
 });
 document.addEventListener('click', (event) => {
   const target = event.target;
@@ -867,6 +889,12 @@ imageModalClose?.addEventListener('click', closeImageModal);
 imageModal?.addEventListener('click', (event) => {
   if (event.target === imageModal) {
     closeImageModal();
+  }
+});
+gplModalClose?.addEventListener('click', closeGplModal);
+gplModal?.addEventListener('click', (event) => {
+  if (event.target === gplModal) {
+    closeGplModal();
   }
 });
   if (changeListButton) {
@@ -908,6 +936,12 @@ imageModal?.addEventListener('click', (event) => {
       menu.removeAttribute('open');
     }
     openRefreshConfirmModal();
+  });
+  gplOpenButton?.addEventListener('click', () => {
+    if (menu?.hasAttribute('open')) {
+      menu.removeAttribute('open');
+    }
+    openGplModal();
   });
 
   renameModalCancel?.addEventListener('click', closeRenameModal);

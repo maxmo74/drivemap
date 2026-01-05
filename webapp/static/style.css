@@ -16,6 +16,7 @@
   --accent-muted: rgba(56, 189, 248, 0.18);
   --danger: #f87171;
   --shadow: 0 24px 50px rgba(2, 8, 23, 0.55);
+  --control-size: 28px;
 }
 
 * {
@@ -50,6 +51,23 @@ header h1 {
   margin: 0;
   font-size: 2.2rem;
   letter-spacing: -0.02em;
+}
+
+.logo {
+  font-family: "Brush Script MT", "Segoe Script", "Lucida Handwriting", cursive;
+  font-style: italic;
+  font-weight: 500;
+  display: flex;
+  align-items: baseline;
+  gap: 0.05rem;
+}
+
+.logo-s {
+  color: var(--accent);
+  font-size: 2.6rem;
+  display: inline-block;
+  transform: rotate(-6deg);
+  text-shadow: 0 6px 16px rgba(56, 189, 248, 0.35);
 }
 
 .app-header {
@@ -92,12 +110,12 @@ header h1 {
 }
 
 .list-panel {
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .search-row {
@@ -266,7 +284,7 @@ button.ghost {
   min-width: 62px;
   height: 100%;
   align-self: stretch;
-  object-fit: contain;
+  object-fit: cover;
   background: #0f172a;
   cursor: zoom-in;
 }
@@ -350,8 +368,8 @@ button.ghost {
   border-radius: var(--radius);
   padding: 0;
   font-size: 0.85rem;
-  width: 32px;
-  height: 32px;
+  width: var(--control-size);
+  height: var(--control-size);
   cursor: grab;
   touch-action: none;
 }
@@ -372,12 +390,17 @@ button.ghost {
 }
 
 .card-action {
-  width: 32px;
-  height: 32px;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   line-height: 1.2;
   border-radius: var(--radius);
+}
+
+.card-action-top {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .card-action.neutral {
@@ -474,10 +497,8 @@ button.ghost {
   }
 
   .brand-row {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -487,8 +508,8 @@ button.ghost {
 
 .menu summary {
   list-style: none;
-  width: 44px;
-  height: 44px;
+  width: var(--control-size);
+  height: var(--control-size);
   border-radius: var(--radius);
   border: 1px solid rgba(148, 163, 184, 0.3);
   background: var(--surface);
@@ -496,8 +517,8 @@ button.ghost {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 5px;
-  padding: 0.5rem;
+  gap: 4px;
+  padding: 0.3rem;
 }
 
 .menu summary::-webkit-details-marker {
@@ -657,18 +678,18 @@ button.ghost {
   color: inherit;
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: var(--radius-pill);
-  width: 32px;
-  height: 32px;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   line-height: 1;
 }
 
 .search-submit {
-  width: 40px;
-  height: 40px;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   border-radius: var(--radius);
   background: var(--accent-muted);
   border: 1px solid rgba(56, 189, 248, 0.5);
@@ -683,10 +704,10 @@ button.ghost {
   background: rgba(251, 191, 36, 0.15);
   border: 1px solid rgba(251, 191, 36, 0.35);
   color: #fcd34d;
-  width: 40px;
-  height: 40px;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
 }
 
 .trending-button:hover,
@@ -714,6 +735,42 @@ button.ghost {
   background: #0f172a;
 }
 
+.gpl-modal {
+  max-width: min(90vw, 760px);
+  max-height: 85vh;
+  padding-top: 2.5rem;
+}
+
+.gpl-link {
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.gpl-link:hover,
+.gpl-link:focus-visible {
+  text-decoration: underline;
+}
+
+.gpl-frame {
+  width: 100%;
+  flex: 1;
+  min-height: 50vh;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius);
+  background: #0f172a;
+}
+
+.app-version-corner {
+  position: fixed;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 @media (max-width: 700px) {
   .card {
     flex-direction: row;
@@ -735,8 +792,8 @@ button.ghost {
   }
 
   .card-action {
-    min-width: 40px;
-    padding: 0.3rem 0.45rem;
-    font-size: 0.8rem;
+    min-width: var(--control-size);
+    padding: 0.15rem 0.3rem;
+    font-size: 0.7rem;
   }
 }
