@@ -4,14 +4,13 @@ const searchButton = document.getElementById('search-button');
 const searchResults = document.getElementById('search-results');
 const searchModal = document.getElementById('search-modal');
 const trendingResults = document.getElementById('trending-results');
-const trendingModal = document.getElementById('trending-modal');
-const trendingModalClose = document.getElementById('trending-modal-close');
+const trendingPopover = document.getElementById('trending-popover');
 const listResults = document.getElementById('list-results');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const changeListButton = document.getElementById('change-list-id');
-const trendingButton = document.getElementById('open-trending');
+const trendingButton = document.getElementById('trending-button');
 const refreshDatabaseButton = document.getElementById('refresh-database');
 const menu = document.querySelector('.menu');
 const roomTagButton = document.getElementById('room-tag-button');
@@ -97,6 +96,7 @@ const openSearchModal = () => {
   if (!searchModal) {
     return;
   }
+  closeTrendingPopover();
   searchModal.classList.add('is-visible');
   searchModal.setAttribute('aria-hidden', 'false');
 };
@@ -141,20 +141,20 @@ const closeRefreshProgressModal = () => {
   refreshProgressModal.setAttribute('aria-hidden', 'true');
 };
 
-const openTrendingModal = () => {
-  if (!trendingModal) {
+const openTrendingPopover = () => {
+  if (!trendingPopover) {
     return;
   }
-  trendingModal.classList.add('is-visible');
-  trendingModal.setAttribute('aria-hidden', 'false');
+  trendingPopover.classList.add('is-visible');
+  trendingPopover.setAttribute('aria-hidden', 'false');
 };
 
-const closeTrendingModal = () => {
-  if (!trendingModal) {
+const closeTrendingPopover = () => {
+  if (!trendingPopover) {
     return;
   }
-  trendingModal.classList.remove('is-visible');
-  trendingModal.setAttribute('aria-hidden', 'true');
+  trendingPopover.classList.remove('is-visible');
+  trendingPopover.setAttribute('aria-hidden', 'true');
 };
 
 const sanitizeRoom = (value) =>
@@ -215,10 +215,12 @@ const buildMetaText = (item) => {
 
 const buildRatingHtml = (item) => {
   const imdbRating = item.rating || 'N/A';
-  const rottenRating = item.rotten_tomatoes || 'N/A';
+  const normalizedType = normalizeTypeLabel(item.type_label);
+  const isSeries = normalizedType === 'tvseries' || normalizedType === 'tvminiseries';
+  const rottenRating = item.rotten_tomatoes || (isSeries ? 'Search' : 'N/A');
   const imdbUrl = `https://www.imdb.com/title/${item.title_id}/`;
   const searchQuery = encodeURIComponent(
-    item.year ? `${item.title} ${item.year}` : item.title
+    isSeries ? item.title : item.year ? `${item.title} ${item.year}` : item.title
   );
   const rottenUrl = `https://www.rottentomatoes.com/search?search=${searchQuery}`;
   return `
@@ -422,7 +424,7 @@ const renderTrendingResults = (items) => {
   if (!limited.length) {
     return;
   }
-  openTrendingModal();
+  openTrendingPopover();
   limited.forEach((item) => {
     const card = buildCard(item, 'search');
     trendingResults.appendChild(card);
@@ -562,7 +564,7 @@ const fetchTrending = async () => {
   if (!trendingResults) {
     return;
   }
-  openTrendingModal();
+  openTrendingPopover();
   showStatus(trendingResults, 'Loading trending titles...');
   try {
     const response = await fetch('/api/trending');
@@ -782,35 +784,31 @@ searchInput.addEventListener('keydown', (event) => {
     fetchSearch();
   }
 });
-trendingModalClose?.addEventListener('click', closeTrendingModal);
-trendingModal?.addEventListener('click', (event) => {
-  if (event.target === trendingModal) {
-    closeTrendingModal();
-  }
-});
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && searchModal?.classList.contains('is-visible')) {
     closeSearchModal();
   }
-  if (event.key === 'Escape' && trendingModal?.classList.contains('is-visible')) {
-    closeTrendingModal();
+  if (event.key === 'Escape' && trendingPopover?.classList.contains('is-visible')) {
+    closeTrendingPopover();
   }
   if (event.key === 'Escape' && imageModal?.classList.contains('is-visible')) {
     closeImageModal();
   }
 });
 document.addEventListener('click', (event) => {
-  if (!searchModal?.classList.contains('is-visible')) {
-    return;
-  }
   const target = event.target;
   if (
     target instanceof Element &&
-    (searchModal.contains(target) || searchInput.contains(target) || searchButton.contains(target))
+    (searchModal?.contains(target) ||
+      trendingPopover?.contains(target) ||
+      searchInput.contains(target) ||
+      searchButton.contains(target) ||
+      trendingButton?.contains(target))
   ) {
     return;
   }
   closeSearchModal();
+  closeTrendingPopover();
 });
 imageModalClose?.addEventListener('click', closeImageModal);
 imageModal?.addEventListener('click', (event) => {
@@ -845,8 +843,10 @@ imageModal?.addEventListener('click', (event) => {
   });
   roomTagButton?.addEventListener('click', openRenameModal);
   trendingButton?.addEventListener('click', () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
+    closeSearchModal();
+    if (trendingPopover?.classList.contains('is-visible')) {
+      closeTrendingPopover();
+      return;
     }
     fetchTrending();
   });
