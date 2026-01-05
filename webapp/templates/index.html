@@ -70,21 +70,24 @@
       <article class="card">
         <img class="card-image" alt="" />
         <div class="card-body">
-          <div class="card-row">
-            <div class="card-title-group">
-              <h3 class="card-title">
-                <a class="card-title-link" target="_blank" rel="noopener noreferrer"></a>
-              </h3>
-            </div>
-            <div class="card-row-actions">
-              <button class="card-action primary">Add</button>
-              <button class="card-action secondary">Watched</button>
-              <button class="card-action danger">Remove</button>
-              <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
-            </div>
+          <div class="card-title-row">
+            <h3 class="card-title">
+              <a class="card-title-link" target="_blank" rel="noopener noreferrer"></a>
+            </h3>
           </div>
-          <p class="card-meta"></p>
-          <p class="card-rating"></p>
+          <div class="card-meta-row">
+            <p class="card-meta"></p>
+            <div class="card-rating"></div>
+          </div>
+          <div class="card-row-actions">
+            <button class="card-action primary">Add</button>
+            <button class="card-action secondary">Watched</button>
+            <button class="card-action neutral card-action-top" type="button" aria-label="Move to top" title="Move to top">
+              ⤒
+            </button>
+            <button class="card-action danger">Remove</button>
+            <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
+          </div>
         </div>
       </article>
     </template>
