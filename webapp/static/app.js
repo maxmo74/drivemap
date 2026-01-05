@@ -56,6 +56,7 @@ const pendingDetailRequests = new Set();
 const detailCache = new Map();
 let refreshPollingTimer;
 let refreshOwner = false;
+const preloadedTabs = new Set();
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
@@ -576,7 +577,32 @@ const loadList = async () => {
   if (listPagination) {
     listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
   }
+  preloadTabImages(activeTab === 'watched' ? 'unwatched' : 'watched');
   pollRefreshStatus();
+};
+
+const preloadTabImages = async (tab) => {
+  if (!tab || preloadedTabs.has(tab)) {
+    return;
+  }
+  preloadedTabs.add(tab);
+  try {
+    const response = await fetch(
+      `/api/list?room=${encodeURIComponent(room)}&status=${tab}&page=1&per_page=${PAGE_SIZE}`
+    );
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    (data.items || []).forEach((item) => {
+      if (item.image) {
+        const img = new Image();
+        img.src = item.image;
+      }
+    });
+  } catch (error) {
+    // no-op
+  }
 };
 
 const fetchTrending = async () => {

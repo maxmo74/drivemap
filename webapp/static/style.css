@@ -249,6 +249,7 @@ button.ghost {
   border-radius: var(--radius);
   overflow: hidden;
   transition: border 150ms ease, transform 150ms ease;
+  align-items: stretch;
 }
 
 .card:hover {
@@ -263,8 +264,9 @@ button.ghost {
 .card-image {
   width: 62px;
   min-width: 62px;
-  height: 92px;
-  object-fit: cover;
+  height: 100%;
+  align-self: stretch;
+  object-fit: contain;
   background: #0f172a;
   cursor: zoom-in;
 }
@@ -346,10 +348,10 @@ button.ghost {
   color: inherit;
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: var(--radius);
-  padding: 0.1rem 0.4rem;
+  padding: 0;
   font-size: 0.85rem;
-  min-height: 28px;
-  min-width: 28px;
+  width: 32px;
+  height: 32px;
   cursor: grab;
   touch-action: none;
 }
@@ -370,9 +372,9 @@ button.ghost {
 }
 
 .card-action {
-  min-width: 28px;
-  min-height: 28px;
-  padding: 0.1rem 0.4rem;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   font-size: 0.85rem;
   line-height: 1.2;
   border-radius: var(--radius);
@@ -665,6 +667,7 @@ button.ghost {
 .search-submit {
   width: 40px;
   height: 40px;
+  padding: 0;
   font-size: 1.1rem;
   border-radius: var(--radius);
   background: var(--accent-muted);
@@ -680,6 +683,10 @@ button.ghost {
   background: rgba(251, 191, 36, 0.15);
   border: 1px solid rgba(251, 191, 36, 0.35);
   color: #fcd34d;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 1.1rem;
 }
 
 .trending-button:hover,
@@ -715,7 +722,7 @@ button.ghost {
   .card-image {
     width: 50px;
     min-width: 50px;
-    height: 70px;
+    height: 100%;
   }
 
   .card-title {
