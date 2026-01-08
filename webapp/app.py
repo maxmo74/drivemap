@@ -37,6 +37,7 @@ class SearchResult:
     title_id: str
     title: str
     year: str | None
+    original_language: str | None
     type_label: str | None
     image: str | None
     rating: str | None
@@ -62,6 +63,7 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
             title_id TEXT NOT NULL,
             title TEXT NOT NULL,
             year TEXT,
+            original_language TEXT,
             type_label TEXT,
             image TEXT,
             rating TEXT,
@@ -84,6 +86,7 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
             total_seasons INTEGER,
             total_episodes INTEGER,
             avg_episode_length INTEGER,
+            original_language TEXT,
             cached_at INTEGER NOT NULL
         );
         """
@@ -109,6 +112,8 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE lists ADD COLUMN total_episodes INTEGER")
     if "avg_episode_length" not in columns:
         conn.execute("ALTER TABLE lists ADD COLUMN avg_episode_length INTEGER")
+    if "original_language" not in columns:
+        conn.execute("ALTER TABLE lists ADD COLUMN original_language TEXT")
     rating_columns = {row["name"] for row in conn.execute("PRAGMA table_info(rating_cache)")}
     if "rotten_tomatoes" not in rating_columns:
         conn.execute("ALTER TABLE rating_cache ADD COLUMN rotten_tomatoes TEXT")
@@ -121,6 +126,8 @@ def _migrate_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE metadata_cache ADD COLUMN total_episodes INTEGER")
     if "avg_episode_length" not in metadata_columns:
         conn.execute("ALTER TABLE metadata_cache ADD COLUMN avg_episode_length INTEGER")
+    if "original_language" not in metadata_columns:
+        conn.execute("ALTER TABLE metadata_cache ADD COLUMN original_language TEXT")
 
 
 def _backfill_positions(conn: sqlite3.Connection, force: bool = False) -> None:
@@ -183,10 +190,10 @@ def _rating_cache_set(
 
 def _metadata_cache_get(
     conn: sqlite3.Connection, title_id: str
-) -> tuple[int | None, int | None, int | None, int | None] | None:
+) -> tuple[int | None, int | None, int | None, int | None, str | None] | None:
     row = conn.execute(
         """
-        SELECT runtime_minutes, total_seasons, total_episodes, avg_episode_length, cached_at
+        SELECT runtime_minutes, total_seasons, total_episodes, avg_episode_length, original_language, cached_at
         FROM metadata_cache WHERE title_id = ?
         """,
         (title_id,),
@@ -200,6 +207,7 @@ def _metadata_cache_get(
         row["total_seasons"],
         row["total_episodes"],
         row["avg_episode_length"],
+        row["original_language"],
     )
 
 
@@ -210,14 +218,24 @@ def _metadata_cache_set(
     total_seasons: int | None,
     total_episodes: int | None,
     avg_episode_length: int | None,
+    original_language: str | None,
 ) -> None:
     conn.execute(
         """
         REPLACE INTO metadata_cache (
-            title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length, cached_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length,
+            original_language, cached_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length, int(time.time())),
+        (
+            title_id,
+            runtime_minutes,
+            total_seasons,
+            total_episodes,
+            avg_episode_length,
+            original_language,
+            int(time.time()),
+        ),
     )
 
 
@@ -269,11 +287,19 @@ def _parse_runtime(runtime: str | None) -> int | None:
     return int(match.group(1))
 
 
+def _parse_original_language(value: str | None) -> str | None:
+    if not value or value == "N/A":
+        return None
+    language = value.split(",")[0].strip()
+    return language or None
+
+
 def _fetch_metadata(
     title_id: str, user_agent: str, normalized_type: str
-) -> tuple[int | None, int | None, int | None, int | None]:
+) -> tuple[int | None, int | None, int | None, int | None, str | None]:
     payload = _fetch_omdb_title(title_id, user_agent)
     runtime_minutes = _parse_runtime(payload.get("Runtime"))
+    original_language = _parse_original_language(payload.get("Language"))
     total_seasons = payload.get("totalSeasons")
     try:
         total_seasons_int = int(total_seasons) if total_seasons else None
@@ -288,12 +314,12 @@ def _fetch_metadata(
             episodes = season_payload.get("Episodes") or []
             total_episodes_count += len(episodes)
         total_episodes = total_episodes_count if total_episodes_count else None
-    return runtime_minutes, total_seasons_int, total_episodes, avg_episode_length
+    return runtime_minutes, total_seasons_int, total_episodes, avg_episode_length, original_language
 
 
 def get_metadata(
     title_id: str, user_agent: str, normalized_type: str
-) -> tuple[int | None, int | None, int | None, int | None]:
+) -> tuple[int | None, int | None, int | None, int | None, str | None]:
     with _get_db() as conn:
         _migrate_db(conn)
         cached = _metadata_cache_get(conn, title_id)
@@ -302,7 +328,7 @@ def get_metadata(
         try:
             metadata = _fetch_metadata(title_id, user_agent, normalized_type)
         except requests.RequestException:
-            metadata = (None, None, None, None)
+            metadata = (None, None, None, None, None)
         _metadata_cache_set(conn, title_id, *metadata)
         conn.commit()
         return metadata
@@ -361,20 +387,24 @@ def _normalize_type_label(type_label: str | None) -> str:
 
 def _refresh_title_details(
     conn: sqlite3.Connection, title_id: str, user_agent: str, normalized_type: str
-) -> tuple[str | None, str | None, int | None, int | None, int | None, int | None]:
+) -> tuple[str | None, str | None, int | None, int | None, int | None, int | None, str | None]:
     try:
         imdb_rating, rotten_rating = _fetch_ratings(title_id, user_agent)
     except requests.RequestException:
         imdb_rating, rotten_rating = None, None
     try:
-        runtime_minutes, total_seasons, total_episodes, avg_episode_length = _fetch_metadata(
-            title_id, user_agent, normalized_type
-        )
+        (
+            runtime_minutes,
+            total_seasons,
+            total_episodes,
+            avg_episode_length,
+            original_language,
+        ) = _fetch_metadata(title_id, user_agent, normalized_type)
     except requests.RequestException:
-        runtime_minutes = total_seasons = total_episodes = avg_episode_length = None
+        runtime_minutes = total_seasons = total_episodes = avg_episode_length = original_language = None
     _rating_cache_set(conn, title_id, imdb_rating, rotten_rating)
     _metadata_cache_set(
-        conn, title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length
+        conn, title_id, runtime_minutes, total_seasons, total_episodes, avg_episode_length, original_language
     )
     return (
         imdb_rating,
@@ -383,6 +413,7 @@ def _refresh_title_details(
         total_seasons,
         total_episodes,
         avg_episode_length,
+        original_language,
     )
 
 
@@ -412,12 +443,13 @@ def _start_refresh(room: str, user_agent: str) -> int:
                     total_seasons,
                     total_episodes,
                     avg_episode_length,
+                    original_language,
                 ) = _refresh_title_details(conn, title_id, user_agent, normalized_type)
                 conn.execute(
                     """
                     UPDATE lists
                     SET rating = ?, rotten_tomatoes = ?, runtime_minutes = ?, total_seasons = ?,
-                        total_episodes = ?, avg_episode_length = ?
+                        total_episodes = ?, avg_episode_length = ?, original_language = ?
                     WHERE room = ? AND title_id = ?
                     """,
                     (
@@ -427,6 +459,7 @@ def _start_refresh(room: str, user_agent: str) -> int:
                         total_seasons,
                         total_episodes,
                         avg_episode_length,
+                        original_language,
                         room,
                         title_id,
                     ),
@@ -458,9 +491,16 @@ def parse_suggestion_item(
         return None
     image_url = item.get("i", {}).get("imageUrl")
     runtime_minutes = total_seasons = total_episodes = avg_episode_length = None
+    original_language = None
     rating = rotten_tomatoes = None
     if include_details:
-        runtime_minutes, total_seasons, total_episodes, avg_episode_length = get_metadata(
+        (
+            runtime_minutes,
+            total_seasons,
+            total_episodes,
+            avg_episode_length,
+            original_language,
+        ) = get_metadata(
             title_id, user_agent, normalized_type
         )
         rating, rotten_tomatoes = get_ratings(title_id, user_agent)
@@ -468,6 +508,7 @@ def parse_suggestion_item(
         title_id=title_id,
         title=item.get("l") or "Untitled",
         year=str(item.get("y")) if item.get("y") else None,
+        original_language=original_language,
         type_label=type_label,
         image=_shrink_image_url(image_url),
         rating=rating,
@@ -557,6 +598,7 @@ def serialize_result(result: SearchResult) -> dict[str, Any]:
         "title_id": result.title_id,
         "title": result.title,
         "year": result.year,
+        "original_language": result.original_language,
         "type_label": result.type_label,
         "image": result.image,
         "rating": result.rating,
@@ -632,7 +674,7 @@ def api_details() -> Any:
     if normalized_type not in ALLOWED_TYPE_LABELS:
         normalized_type = "movie"
     user_agent = _request_user_agent()
-    runtime_minutes, total_seasons, total_episodes, avg_episode_length = get_metadata(
+    runtime_minutes, total_seasons, total_episodes, avg_episode_length, original_language = get_metadata(
         title_id, user_agent, normalized_type
     )
     rating, rotten_tomatoes = get_ratings(title_id, user_agent)
@@ -644,6 +686,7 @@ def api_details() -> Any:
             "total_seasons": total_seasons,
             "total_episodes": total_episodes,
             "avg_episode_length": avg_episode_length,
+            "original_language": original_language,
         }
     )
 
@@ -743,15 +786,16 @@ def api_add() -> Any:
         conn.execute(
             """
             REPLACE INTO lists (
-                room, title_id, title, year, type_label, image, rating, rotten_tomatoes,
+                room, title_id, title, year, original_language, type_label, image, rating, rotten_tomatoes,
                 runtime_minutes, total_seasons, total_episodes, avg_episode_length, added_at, watched
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 room,
                 title_id,
                 title,
                 data.get("year"),
+                data.get("original_language"),
                 data.get("type_label"),
                 data.get("image"),
                 data.get("rating"),
