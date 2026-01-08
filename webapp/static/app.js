@@ -222,6 +222,9 @@ const buildMetaText = (item) => {
   if (item.year) {
     metaParts.push(item.year);
   }
+  if (item.original_language) {
+    metaParts.push(item.original_language);
+  }
   const runtimeMinutes = Number(item.runtime_minutes);
   const avgEpisodeLength = Number(item.avg_episode_length);
   if (normalizedType === 'movie' || normalizedType === 'tvmovie' || normalizedType === 'feature') {
@@ -348,7 +351,8 @@ const needsDetails = (item) => {
   const hasSeasons = item.total_seasons !== null && item.total_seasons !== undefined;
   const hasEpisodes = item.total_episodes !== null && item.total_episodes !== undefined;
   const hasAvg = item.avg_episode_length !== null && item.avg_episode_length !== undefined;
-  return !(hasRating && hasRotten && hasRuntime && hasSeasons && hasEpisodes && hasAvg);
+  const hasLanguage = item.original_language !== null && item.original_language !== undefined;
+  return !(hasRating && hasRotten && hasRuntime && hasSeasons && hasEpisodes && hasAvg && hasLanguage);
 };
 
 const requestDetails = async (item, article) => {
@@ -650,10 +654,11 @@ const fetchTrending = async () => {
 };
 
 const addToList = async (item, watched, cardNode) => {
+  const cachedDetails = detailCache.get(item.title_id) || {};
   const response = await fetch('/api/list', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...item, room, watched })
+    body: JSON.stringify({ ...item, ...cachedDetails, room, watched })
   });
   if (!response.ok) {
     alert('Failed to add item.');
