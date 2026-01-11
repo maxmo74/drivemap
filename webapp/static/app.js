@@ -8,6 +8,8 @@ const trendingPopover = document.getElementById('trending-popover');
 const listResults = document.getElementById('list-results');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
+const countWatchlist = document.getElementById('count-watchlist');
+const countWatched = document.getElementById('count-watched');
 const cardTemplate = document.getElementById('result-card-template');
 const trendingButton = document.getElementById('trending-button');
 const refreshDatabaseButton = document.getElementById('refresh-database');
@@ -420,6 +422,10 @@ const renderVisitedRooms = () => {
   rooms.forEach(([roomId, data]) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'visited-room';
+    wrapper.dataset.room = roomId;
+    const countBadge = document.createElement('div');
+    countBadge.className = 'visited-room-count';
+    countBadge.textContent = data.count !== undefined ? String(data.count) : '…';
     const header = document.createElement('div');
     header.className = 'visited-room-header';
     const name = document.createElement('div');
@@ -428,7 +434,7 @@ const renderVisitedRooms = () => {
     const headerActions = document.createElement('div');
     headerActions.className = 'visited-room-actions';
     const status = document.createElement('span');
-    status.className = 'visited-room-status';
+    status.className = 'visited-room-status room-visibility';
     status.textContent = data.private ? 'Private' : 'Public';
     if (data.private) {
       status.classList.add('is-private');
@@ -472,11 +478,40 @@ const renderVisitedRooms = () => {
     const password = document.createElement('div');
     password.className = 'visited-room-password';
     password.textContent = data.private ? `Password: ${data.password}` : 'Password: —';
+    wrapper.appendChild(countBadge);
     wrapper.appendChild(header);
     wrapper.appendChild(toggleRow);
     wrapper.appendChild(password);
     visitedRoomsContainer.appendChild(wrapper);
   });
+};
+
+const updateVisitedRoomCounts = async () => {
+  const rooms = Object.keys(settings.rooms);
+  await Promise.all(
+    rooms.map(async (roomId) => {
+      try {
+        const [unwatched, watched] = await Promise.all([
+          fetch(`/api/list?room=${encodeURIComponent(roomId)}&status=unwatched&page=1&per_page=1`),
+          fetch(`/api/list?room=${encodeURIComponent(roomId)}&status=watched&page=1&per_page=1`)
+        ]);
+        if (!unwatched.ok || !watched.ok) {
+          return;
+        }
+        const unwatchedData = await unwatched.json();
+        const watchedData = await watched.json();
+        const total = (unwatchedData.total_count || 0) + (watchedData.total_count || 0);
+        settings.rooms[roomId].count = total;
+        const badge = visitedRoomsContainer?.querySelector(`[data-room="${roomId}"] .visited-room-count`);
+        if (badge) {
+          badge.textContent = String(total);
+        }
+      } catch (error) {
+        // no-op
+      }
+    })
+  );
+  saveSettings();
 };
 
 const openOptionsModal = () => {
@@ -485,6 +520,7 @@ const openOptionsModal = () => {
   }
   renderDefaultRoomOptions();
   renderVisitedRooms();
+  updateVisitedRoomCounts();
   optionsModal.classList.add('is-visible');
   optionsModal.setAttribute('aria-hidden', 'false');
 };
@@ -897,6 +933,12 @@ const loadList = async () => {
   totalPages[activeTab] = data.total_pages || 1;
   currentListItems = data.items || [];
   renderList(applyFilter(currentListItems));
+  if (activeTab === 'unwatched' && countWatchlist) {
+    countWatchlist.textContent = String(data.total_count || 0);
+  }
+  if (activeTab === 'watched' && countWatched) {
+    countWatched.textContent = String(data.total_count || 0);
+  }
   if (listPageStatus) {
     listPageStatus.textContent = `Page ${pageState[activeTab]} of ${totalPages[activeTab]}`;
   }
@@ -1306,122 +1348,6 @@ openOptionsButton?.addEventListener('click', () => {
     menu.removeAttribute('open');
   }
   openOptionsModal();
-});
-
-optionsModalClose?.addEventListener('click', closeOptionsModal);
-optionsModal?.addEventListener('click', (event) => {
-  if (event.target === optionsModal) {
-    closeOptionsModal();
-  }
-});
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && optionsModal?.classList.contains('is-visible')) {
-    closeOptionsModal();
-  }
-});
-optionCompact?.addEventListener('change', (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  settings.compact = target.checked;
-  applyCompactSetting();
-  saveSettings();
-});
-defaultRoomSelect?.addEventListener('change', (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  settings.defaultRoom = target.value;
-  saveSettings();
-});
-
-shareRoomButton?.addEventListener('click', () => {
-  openShareModal();
-});
-shareModalClose?.addEventListener('click', closeShareModal);
-shareModal?.addEventListener('click', (event) => {
-  if (event.target === shareModal) {
-    closeShareModal();
-  }
-});
-shareCopyButton?.addEventListener('click', async () => {
-  const url = shareModal?.dataset.shareUrl;
-  if (!url) {
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    shareModalMessage.textContent = 'Copied to clipboard!';
-  } catch (error) {
-    shareModalMessage.textContent = 'Copy failed. Select the URL manually.';
-  }
-});
-shareEmailButton?.addEventListener('click', () => {
-  const url = shareModal?.dataset.shareUrl;
-  if (!url) {
-    return;
-  }
-  window.open(`mailto:?subject=Shovo list&body=${encodeURIComponent(url)}`, '_blank');
-});
-shareWhatsAppButton?.addEventListener('click', () => {
-  const url = shareModal?.dataset.shareUrl;
-  if (!url) {
-    return;
-  }
-  window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank');
-});
-shareMessengerButton?.addEventListener('click', () => {
-  const url = shareModal?.dataset.shareUrl;
-  if (!url) {
-    return;
-  }
-  window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent(url)}`, '_blank');
-});
-shareTelegramButton?.addEventListener('click', () => {
-  const url = shareModal?.dataset.shareUrl;
-  if (!url) {
-    return;
-  }
-  window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}`, '_blank');
-});
-shareInstagramButton?.addEventListener('click', () => {
-  const url = shareModal?.dataset.shareUrl;
-  if (!url) {
-    return;
-  }
-  handleShareAction(url);
-  shareModalMessage.textContent = 'Instagram sharing isn’t direct. Copy the link and share it in the app.';
-});
-
-privacyCancelButton?.addEventListener('click', () => {
-  closePrivacyModal();
-});
-privacyModal?.addEventListener('click', (event) => {
-  if (event.target === privacyModal) {
-    closePrivacyModal();
-  }
-});
-privacyUnlockButton?.addEventListener('click', () => {
-  if (!privacyPasswordInput) {
-    return;
-  }
-  const attempt = privacyPasswordInput.value.trim();
-  if (attempt && attempt === getRoomPassword(room)) {
-    settings.rooms[room].authorized = true;
-    saveSettings();
-    closePrivacyModal();
-    loadList();
-  } else {
-    privacyError?.removeAttribute('hidden');
-  }
-});
-privacyPasswordInput?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    privacyUnlockButton?.click();
-  }
 });
 
 optionsModalClose?.addEventListener('click', closeOptionsModal);
