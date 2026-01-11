@@ -12,17 +12,15 @@
         <div class="brand-row">
           <div class="brand-top">
             <h1 class="logo">
-              <span class="logo-mark">
-                <span class="logo-orbit"></span>
-                <span class="logo-core"></span>
-                <span class="logo-play">▶</span>
-              </span>
+              <span class="logo-play">▶</span>
               <span class="logo-text">Shovo</span>
             </h1>
             <button class="version-tag" id="app-version-tag" type="button">v{{ app_version }}</button>
           </div>
+        </div>
+        <div class="header-actions">
           <div class="room-pill">
-            <span class="room-label">Lists</span>
+            <span class="room-label">List</span>
             <button class="room-tag room-link" id="room-tag-button" type="button">
               <span class="room-name" id="room-id">{{ room }}</span>
             </button>
@@ -32,8 +30,6 @@
               ↗
             </button>
           </div>
-        </div>
-        <div class="header-actions">
           <details class="menu">
             <summary aria-label="Open menu">
               <span></span>
@@ -44,7 +40,6 @@
               <div class="menu-item">
                 <strong class="menu-version" id="app-version">Shovo v{{ app_version }}</strong>
               </div>
-              <button class="menu-action" id="change-list-id" type="button">Rename List ID</button>
               <button class="menu-action" id="open-options" type="button">Options</button>
               <button class="menu-action" id="refresh-database" type="button">Refresh Database</button>
               <button class="menu-action" id="open-about" type="button">About</button>
@@ -60,10 +55,14 @@
             <button id="tab-watched" class="tab" role="tab">Watched</button>
           </div>
           <div class="search-row inline-search search-container">
-            <input id="search-input" type="search" placeholder="Search for a movie or show" />
-            <button id="search-button" class="icon-button search-submit" type="button" aria-label="Search">
-              🔍
-            </button>
+            <div class="input-with-clear">
+              <input id="filter-input" type="search" placeholder="Filter current list" />
+              <button class="input-clear" id="filter-clear" type="button" aria-label="Clear filter">×</button>
+            </div>
+            <div class="input-with-clear">
+              <input id="search-input" type="search" placeholder="Search for a movie or show" />
+              <button class="input-clear" id="search-clear" type="button" aria-label="Clear search">×</button>
+            </div>
             <button id="trending-button" class="icon-button trending-button" type="button" aria-label="Trending">
               🔥
             </button>
@@ -111,22 +110,6 @@
         </div>
       </article>
     </template>
-
-    <div class="modal-overlay" id="rename-modal" aria-hidden="true" role="dialog" aria-modal="true">
-      <div class="modal">
-        <div class="modal-header modal-header--compact">
-          <button class="icon-button" id="rename-modal-close" type="button" aria-label="Close rename prompt">
-            ×
-          </button>
-        </div>
-        <p class="modal-subtitle">Rename List ID</p>
-        <input id="rename-modal-input" type="text" autocomplete="off" />
-        <div class="modal-actions">
-          <button class="ghost" id="rename-modal-cancel" type="button">Cancel</button>
-          <button id="rename-modal-confirm" type="button">Save</button>
-        </div>
-      </div>
-    </div>
 
     <div class="modal-overlay" id="refresh-confirm-modal" aria-hidden="true" role="dialog" aria-modal="true">
       <div class="modal">

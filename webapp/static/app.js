@@ -1,6 +1,6 @@
 const room = window.APP_ROOM;
 const searchInput = document.getElementById('search-input');
-const searchButton = document.getElementById('search-button');
+const filterInput = document.getElementById('filter-input');
 const searchResults = document.getElementById('search-results');
 const searchModal = document.getElementById('search-modal');
 const trendingResults = document.getElementById('trending-results');
@@ -9,7 +9,6 @@ const listResults = document.getElementById('list-results');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
-const changeListButton = document.getElementById('change-list-id');
 const trendingButton = document.getElementById('trending-button');
 const refreshDatabaseButton = document.getElementById('refresh-database');
 const menu = document.querySelector('.menu');
@@ -18,11 +17,6 @@ const roomVisibility = document.getElementById('room-visibility');
 const roomCount = document.getElementById('room-count');
 const shareRoomButton = document.getElementById('share-room');
 const appVersionTag = document.getElementById('app-version-tag');
-const renameModal = document.getElementById('rename-modal');
-const renameModalInput = document.getElementById('rename-modal-input');
-const renameModalCancel = document.getElementById('rename-modal-cancel');
-const renameModalConfirm = document.getElementById('rename-modal-confirm');
-const renameModalClose = document.getElementById('rename-modal-close');
 const refreshConfirmModal = document.getElementById('refresh-confirm-modal');
 const refreshConfirmCancel = document.getElementById('refresh-confirm-cancel');
 const refreshConfirmStart = document.getElementById('refresh-confirm-start');
@@ -53,6 +47,8 @@ const shareMessengerButton = document.getElementById('share-messenger');
 const shareTelegramButton = document.getElementById('share-telegram');
 const shareInstagramButton = document.getElementById('share-instagram');
 const shareModalMessage = document.getElementById('share-modal-message');
+const searchClearButton = document.getElementById('search-clear');
+const filterClearButton = document.getElementById('filter-clear');
 const privacyModal = document.getElementById('privacy-modal');
 const privacyPasswordInput = document.getElementById('privacy-password');
 const privacyCancelButton = document.getElementById('privacy-cancel');
@@ -86,6 +82,7 @@ const detailCache = new Map();
 let refreshPollingTimer;
 let refreshOwner = false;
 const preloadedTabs = new Set();
+let currentListItems = [];
 let settings = {
   compact: false,
   defaultRoom: '',
@@ -307,12 +304,6 @@ const closeTrendingPopover = () => {
   trendingPopover.setAttribute('aria-hidden', 'true');
 };
 
-const sanitizeRoom = (value) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '');
-
 const normalizeTypeLabel = (typeLabel) =>
   (typeLabel || '')
     .toLowerCase()
@@ -387,6 +378,14 @@ const applyCompactSetting = () => {
   if (optionCompact) {
     optionCompact.checked = settings.compact;
   }
+};
+
+const applyFilter = (items) => {
+  const query = filterInput?.value.trim().toLowerCase();
+  if (!query) {
+    return items;
+  }
+  return items.filter((item) => item.title.toLowerCase().includes(query));
 };
 
 const renderDefaultRoomOptions = () => {
@@ -777,6 +776,11 @@ const renderTrendingResults = (items) => {
 const renderList = (items) => {
   listResults.innerHTML = '';
   if (!items.length) {
+    const hasFilter = filterInput?.value.trim();
+    if (hasFilter && currentListItems.length) {
+      showStatus(listResults, 'No matches in this list.');
+      return;
+    }
     showStatus(
       listResults,
       activeTab === 'watched'
@@ -891,7 +895,8 @@ const loadList = async () => {
     return;
   }
   totalPages[activeTab] = data.total_pages || 1;
-  renderList(data.items || []);
+  currentListItems = data.items || [];
+  renderList(applyFilter(currentListItems));
   if (listPageStatus) {
     listPageStatus.textContent = `Page ${pageState[activeTab]} of ${totalPages[activeTab]}`;
   }
@@ -1197,13 +1202,33 @@ const updateRoomLabel = () => {
   updateRoomCount();
 };
 
-searchButton.addEventListener('click', fetchSearch);
 searchInput.addEventListener('input', debounceSearch);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
     fetchSearch();
   }
+});
+filterInput?.addEventListener('input', () => {
+  renderList(applyFilter(currentListItems));
+});
+searchClearButton?.addEventListener('click', () => {
+  if (!searchInput) {
+    return;
+  }
+  searchInput.value = '';
+  lastSearchQuery = '';
+  lastSearchResults = [];
+  closeSearchModal();
+  searchInput.focus();
+});
+filterClearButton?.addEventListener('click', () => {
+  if (!filterInput) {
+    return;
+  }
+  filterInput.value = '';
+  renderList(applyFilter(currentListItems));
+  filterInput.focus();
 });
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && searchModal?.classList.contains('is-visible')) {
@@ -1224,6 +1249,9 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && privacyModal?.classList.contains('is-visible')) {
     closePrivacyModal();
   }
+  if (event.key === 'Escape' && optionsModal?.classList.contains('is-visible')) {
+    closeOptionsModal();
+  }
 });
 document.addEventListener('click', (event) => {
   const target = event.target;
@@ -1232,7 +1260,6 @@ document.addEventListener('click', (event) => {
     (searchModal?.contains(target) ||
       trendingPopover?.contains(target) ||
       searchInput.contains(target) ||
-      searchButton.contains(target) ||
       trendingButton?.contains(target))
   ) {
     return;
@@ -1252,107 +1279,150 @@ aboutModal?.addEventListener('click', (event) => {
     closeAboutModal();
   }
 });
-if (changeListButton) {
-  const closeRenameModal = () => {
-    if (!renameModal) {
-      return;
-    }
-    renameModal.classList.remove('is-visible');
-    renameModal.setAttribute('aria-hidden', 'true');
-  };
-  const openRenameModal = () => {
-    if (!renameModal || !renameModalInput) {
-      return;
-    }
-    renameModalInput.value = room;
-    renameModal.classList.add('is-visible');
-    renameModal.setAttribute('aria-hidden', 'false');
-    renameModalInput.focus();
-    renameModalInput.select();
-  };
+roomTagButton?.addEventListener('click', openOptionsModal);
+trendingButton?.addEventListener('click', () => {
+  closeSearchModal();
+  if (trendingPopover?.classList.contains('is-visible')) {
+    closeTrendingPopover();
+    return;
+  }
+  fetchTrending();
+});
+refreshDatabaseButton?.addEventListener('click', async () => {
+  if (menu?.hasAttribute('open')) {
+    menu.removeAttribute('open');
+  }
+  openRefreshConfirmModal();
+});
+aboutOpenButton?.addEventListener('click', () => {
+  if (menu?.hasAttribute('open')) {
+    menu.removeAttribute('open');
+  }
+  openAboutModal();
+});
+appVersionTag?.addEventListener('click', openAboutModal);
+openOptionsButton?.addEventListener('click', () => {
+  if (menu?.hasAttribute('open')) {
+    menu.removeAttribute('open');
+  }
+  openOptionsModal();
+});
 
-  changeListButton.addEventListener('click', () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openRenameModal();
-  });
-  roomTagButton?.addEventListener('click', openRenameModal);
-  trendingButton?.addEventListener('click', () => {
-    closeSearchModal();
-    if (trendingPopover?.classList.contains('is-visible')) {
-      closeTrendingPopover();
-      return;
-    }
-    fetchTrending();
-  });
-  refreshDatabaseButton?.addEventListener('click', async () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openRefreshConfirmModal();
-  });
-  aboutOpenButton?.addEventListener('click', () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openAboutModal();
-  });
-  appVersionTag?.addEventListener('click', openAboutModal);
-  openOptionsButton?.addEventListener('click', () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openOptionsModal();
-  });
+optionsModalClose?.addEventListener('click', closeOptionsModal);
+optionsModal?.addEventListener('click', (event) => {
+  if (event.target === optionsModal) {
+    closeOptionsModal();
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && optionsModal?.classList.contains('is-visible')) {
+    closeOptionsModal();
+  }
+});
+optionCompact?.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  settings.compact = target.checked;
+  applyCompactSetting();
+  saveSettings();
+});
+defaultRoomSelect?.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  settings.defaultRoom = target.value;
+  saveSettings();
+});
 
-  renameModalCancel?.addEventListener('click', closeRenameModal);
-  renameModalClose?.addEventListener('click', closeRenameModal);
-  renameModal?.addEventListener('click', (event) => {
-    if (event.target === renameModal) {
-      closeRenameModal();
-    }
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && renameModal?.classList.contains('is-visible')) {
-      closeRenameModal();
-    }
-  });
-  renameModalInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      renameModalConfirm?.click();
-    }
-  });
+shareRoomButton?.addEventListener('click', () => {
+  openShareModal();
+});
+shareModalClose?.addEventListener('click', closeShareModal);
+shareModal?.addEventListener('click', (event) => {
+  if (event.target === shareModal) {
+    closeShareModal();
+  }
+});
+shareCopyButton?.addEventListener('click', async () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    shareModalMessage.textContent = 'Copied to clipboard!';
+  } catch (error) {
+    shareModalMessage.textContent = 'Copy failed. Select the URL manually.';
+  }
+});
+shareEmailButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`mailto:?subject=Shovo list&body=${encodeURIComponent(url)}`, '_blank');
+});
+shareWhatsAppButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank');
+});
+shareMessengerButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent(url)}`, '_blank');
+});
+shareTelegramButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}`, '_blank');
+});
+shareInstagramButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  handleShareAction(url);
+  shareModalMessage.textContent = 'Instagram sharing isn’t direct. Copy the link and share it in the app.';
+});
 
-  renameModalConfirm?.addEventListener('click', async () => {
-    if (!renameModalInput) {
-      return;
-    }
-    const nextRoom = sanitizeRoom(renameModalInput.value);
-    if (!nextRoom || nextRoom === room) {
-      closeRenameModal();
-      return;
-    }
-    const response = await fetch('/api/list/rename', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room, next_room: nextRoom })
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      alert(data.message || 'Unable to rename list.');
-      return;
-    }
-    settings.rooms[nextRoom] = { ...(settings.rooms[room] || {}), lastVisited: Date.now() };
-    delete settings.rooms[room];
-    if (settings.defaultRoom === room) {
-      settings.defaultRoom = nextRoom;
-    }
+privacyCancelButton?.addEventListener('click', () => {
+  closePrivacyModal();
+});
+privacyModal?.addEventListener('click', (event) => {
+  if (event.target === privacyModal) {
+    closePrivacyModal();
+  }
+});
+privacyUnlockButton?.addEventListener('click', () => {
+  if (!privacyPasswordInput) {
+    return;
+  }
+  const attempt = privacyPasswordInput.value.trim();
+  if (attempt && attempt === getRoomPassword(room)) {
+    settings.rooms[room].authorized = true;
     saveSettings();
-    window.location.href = `/r/${encodeURIComponent(nextRoom)}`;
-  });
-}
+    closePrivacyModal();
+    loadList();
+  } else {
+    privacyError?.removeAttribute('hidden');
+  }
+});
+privacyPasswordInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    privacyUnlockButton?.click();
+  }
+});
 
 optionsModalClose?.addEventListener('click', closeOptionsModal);
 optionsModal?.addEventListener('click', (event) => {
