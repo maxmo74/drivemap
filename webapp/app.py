@@ -20,11 +20,12 @@ IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.j
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"
 OMDB_URL = "https://www.omdbapi.com/"
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 MAX_RESULTS = 10
 IMDB_TRENDING_URL = "https://www.imdb.com/chart/moviemeter/"
 ALLOWED_TYPE_LABELS = {"feature", "movie", "tvseries", "tvminiseries", "tvmovie"}
 OMDB_API_KEY = os.environ.get("OMDB_API_KEY", "thewdb")
+DEFAULT_ROOM_COOKIE = "shovo_default_room"
 
 app = Flask(__name__)
 
@@ -643,12 +644,18 @@ def _parse_watched(value: Any) -> int:
 
 @app.route("/")
 def root() -> Any:
+    default_room = request.cookies.get(DEFAULT_ROOM_COOKIE)
+    if default_room:
+        return redirect(f"/r/{default_room}")
     return redirect("/r/new")
 
 
 @app.route("/r/<room>")
 def room(room: str) -> Any:
     if room == "new":
+        default_room = request.cookies.get(DEFAULT_ROOM_COOKIE)
+        if default_room:
+            return redirect(f"/r/{default_room}")
         return redirect(f"/r/{_default_room()}")
     return render_template("index.html", room=room, app_version=APP_VERSION)
 
