@@ -97,6 +97,19 @@ header h1 {
   gap: 0.6rem;
 }
 
+.logo-play {
+  position: absolute;
+  font-size: 0.85rem;
+  color: #051525;
+  transform: translateX(1px);
+}
+
+.brand-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .app-header {
   align-items: center;
   justify-content: space-between;

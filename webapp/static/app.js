@@ -1424,6 +1424,122 @@ privacyPasswordInput?.addEventListener('keydown', (event) => {
   }
 });
 
+optionsModalClose?.addEventListener('click', closeOptionsModal);
+optionsModal?.addEventListener('click', (event) => {
+  if (event.target === optionsModal) {
+    closeOptionsModal();
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && optionsModal?.classList.contains('is-visible')) {
+    closeOptionsModal();
+  }
+});
+optionCompact?.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  settings.compact = target.checked;
+  applyCompactSetting();
+  saveSettings();
+});
+defaultRoomSelect?.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  settings.defaultRoom = target.value;
+  saveSettings();
+});
+
+shareRoomButton?.addEventListener('click', () => {
+  openShareModal();
+});
+shareModalClose?.addEventListener('click', closeShareModal);
+shareModal?.addEventListener('click', (event) => {
+  if (event.target === shareModal) {
+    closeShareModal();
+  }
+});
+shareCopyButton?.addEventListener('click', async () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    shareModalMessage.textContent = 'Copied to clipboard!';
+  } catch (error) {
+    shareModalMessage.textContent = 'Copy failed. Select the URL manually.';
+  }
+});
+shareEmailButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`mailto:?subject=Shovo list&body=${encodeURIComponent(url)}`, '_blank');
+});
+shareWhatsAppButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank');
+});
+shareMessengerButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent(url)}`, '_blank');
+});
+shareTelegramButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}`, '_blank');
+});
+shareInstagramButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  handleShareAction(url);
+  shareModalMessage.textContent = 'Instagram sharing isn’t direct. Copy the link and share it in the app.';
+});
+
+privacyCancelButton?.addEventListener('click', () => {
+  closePrivacyModal();
+});
+privacyModal?.addEventListener('click', (event) => {
+  if (event.target === privacyModal) {
+    closePrivacyModal();
+  }
+});
+privacyUnlockButton?.addEventListener('click', () => {
+  if (!privacyPasswordInput) {
+    return;
+  }
+  const attempt = privacyPasswordInput.value.trim();
+  if (attempt && attempt === getRoomPassword(room)) {
+    settings.rooms[room].authorized = true;
+    saveSettings();
+    closePrivacyModal();
+    loadList();
+  } else {
+    privacyError?.removeAttribute('hidden');
+  }
+});
+privacyPasswordInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    privacyUnlockButton?.click();
+  }
+});
+
 refreshConfirmCancel?.addEventListener('click', closeRefreshConfirmModal);
 refreshConfirmClose?.addEventListener('click', closeRefreshConfirmModal);
 refreshConfirmModal?.addEventListener('click', (event) => {
