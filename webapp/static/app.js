@@ -1,6 +1,6 @@
 const room = window.APP_ROOM;
 const searchInput = document.getElementById('search-input');
-const searchButton = document.getElementById('search-button');
+const filterInput = document.getElementById('filter-input');
 const searchResults = document.getElementById('search-results');
 const searchModal = document.getElementById('search-modal');
 const trendingResults = document.getElementById('trending-results');
@@ -9,16 +9,14 @@ const listResults = document.getElementById('list-results');
 const tabWatchlist = document.getElementById('tab-watchlist');
 const tabWatched = document.getElementById('tab-watched');
 const cardTemplate = document.getElementById('result-card-template');
-const changeListButton = document.getElementById('change-list-id');
 const trendingButton = document.getElementById('trending-button');
 const refreshDatabaseButton = document.getElementById('refresh-database');
 const menu = document.querySelector('.menu');
 const roomTagButton = document.getElementById('room-tag-button');
-const renameModal = document.getElementById('rename-modal');
-const renameModalInput = document.getElementById('rename-modal-input');
-const renameModalCancel = document.getElementById('rename-modal-cancel');
-const renameModalConfirm = document.getElementById('rename-modal-confirm');
-const renameModalClose = document.getElementById('rename-modal-close');
+const roomVisibility = document.getElementById('room-visibility');
+const roomCount = document.getElementById('room-count');
+const shareRoomButton = document.getElementById('share-room');
+const appVersionTag = document.getElementById('app-version-tag');
 const refreshConfirmModal = document.getElementById('refresh-confirm-modal');
 const refreshConfirmCancel = document.getElementById('refresh-confirm-cancel');
 const refreshConfirmStart = document.getElementById('refresh-confirm-start');
@@ -34,7 +32,28 @@ const imageModalImage = document.getElementById('image-modal-image');
 const aboutModal = document.getElementById('about-modal');
 const aboutModalClose = document.getElementById('about-modal-close');
 const aboutOpenButton = document.getElementById('open-about');
-const aboutVersionButton = document.getElementById('app-version-corner');
+const openOptionsButton = document.getElementById('open-options');
+const optionsModal = document.getElementById('options-modal');
+const optionsModalClose = document.getElementById('options-modal-close');
+const optionCompact = document.getElementById('option-compact');
+const defaultRoomSelect = document.getElementById('default-room-select');
+const visitedRoomsContainer = document.getElementById('visited-rooms');
+const shareModal = document.getElementById('share-modal');
+const shareModalClose = document.getElementById('share-modal-close');
+const shareCopyButton = document.getElementById('share-copy');
+const shareEmailButton = document.getElementById('share-email');
+const shareWhatsAppButton = document.getElementById('share-whatsapp');
+const shareMessengerButton = document.getElementById('share-messenger');
+const shareTelegramButton = document.getElementById('share-telegram');
+const shareInstagramButton = document.getElementById('share-instagram');
+const shareModalMessage = document.getElementById('share-modal-message');
+const searchClearButton = document.getElementById('search-clear');
+const filterClearButton = document.getElementById('filter-clear');
+const privacyModal = document.getElementById('privacy-modal');
+const privacyPasswordInput = document.getElementById('privacy-password');
+const privacyCancelButton = document.getElementById('privacy-cancel');
+const privacyUnlockButton = document.getElementById('privacy-unlock');
+const privacyError = document.getElementById('privacy-error');
 const listPagination = document.getElementById('list-pagination');
 const listPrev = document.getElementById('list-prev');
 const listNext = document.getElementById('list-next');
@@ -42,6 +61,8 @@ const listPageStatus = document.getElementById('list-page-status');
 
 const MAX_RESULTS = 10;
 const PAGE_SIZE = 10;
+const SETTINGS_COOKIE = 'shovo_settings';
+const DEFAULT_ROOM_COOKIE = 'shovo_default_room';
 let activeTab = 'unwatched';
 let searchTimer;
 let activeSearchController;
@@ -61,9 +82,114 @@ const detailCache = new Map();
 let refreshPollingTimer;
 let refreshOwner = false;
 const preloadedTabs = new Set();
+let currentListItems = [];
+let settings = {
+  compact: false,
+  defaultRoom: '',
+  rooms: {}
+};
 
 const showStatus = (container, message) => {
   container.innerHTML = `<p class="card-meta">${message}</p>`;
+};
+
+const getCookie = (name) => {
+  const cookies = document.cookie.split(';').map((cookie) => cookie.trim());
+  const entry = cookies.find((cookie) => cookie.startsWith(`${name}=`));
+  if (!entry) {
+    return '';
+  }
+  return decodeURIComponent(entry.split('=').slice(1).join('='));
+};
+
+const setCookie = (name, value, days = 365) => {
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+};
+
+const loadSettings = () => {
+  try {
+    const raw = getCookie(SETTINGS_COOKIE);
+    if (!raw) {
+      return { compact: false, defaultRoom: '', rooms: {} };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      compact: Boolean(parsed.compact),
+      defaultRoom: parsed.defaultRoom || '',
+      rooms: parsed.rooms || {}
+    };
+  } catch (error) {
+    return { compact: false, defaultRoom: '', rooms: {} };
+  }
+};
+
+const saveSettings = () => {
+  setCookie(SETTINGS_COOKIE, JSON.stringify(settings));
+  if (settings.defaultRoom) {
+    setCookie(DEFAULT_ROOM_COOKIE, settings.defaultRoom);
+  }
+};
+
+const ensureRoomState = (roomId) => {
+  if (!settings.rooms[roomId]) {
+    settings.rooms[roomId] = {
+      private: false,
+      password: '',
+      lastVisited: Date.now(),
+      authorized: true
+    };
+  } else {
+    settings.rooms[roomId].lastVisited = Date.now();
+    if (settings.rooms[roomId].private && !settings.rooms[roomId].password) {
+      settings.rooms[roomId].password = generatePassword();
+    }
+  }
+};
+
+const generatePassword = () => {
+  const bytes = new Uint8Array(8);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+};
+
+const encodeShareToken = (payload) => {
+  const raw = JSON.stringify(payload);
+  return btoa(unescape(encodeURIComponent(raw)));
+};
+
+const decodeShareToken = (token) => {
+  try {
+    const raw = decodeURIComponent(escape(atob(token)));
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const isRoomPrivate = (roomId) => settings.rooms[roomId]?.private;
+const getRoomPassword = (roomId) => settings.rooms[roomId]?.password || '';
+const isRoomAuthorized = (roomId) => settings.rooms[roomId]?.authorized !== false;
+
+const updateRoomVisibilityBadge = () => {
+  if (!roomVisibility) {
+    return;
+  }
+  if (isRoomPrivate(room)) {
+    roomVisibility.textContent = 'Private';
+    roomVisibility.classList.add('is-private');
+  } else {
+    roomVisibility.textContent = 'Public';
+    roomVisibility.classList.remove('is-private');
+  }
+};
+
+const updateRoomCount = () => {
+  if (!roomCount) {
+    return;
+  }
+  const total = Object.keys(settings.rooms).length || 1;
+  roomCount.textContent = `${total} ${total === 1 ? 'list' : 'lists'}`;
 };
 
 const getLargeImage = (url) => {
@@ -178,12 +304,6 @@ const closeTrendingPopover = () => {
   trendingPopover.setAttribute('aria-hidden', 'true');
 };
 
-const sanitizeRoom = (value) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '');
-
 const normalizeTypeLabel = (typeLabel) =>
   (typeLabel || '')
     .toLowerCase()
@@ -251,6 +371,182 @@ const buildMetaText = (item) => {
     }
   }
   return metaParts.join(' . ') || 'Unknown';
+};
+
+const applyCompactSetting = () => {
+  document.body.classList.toggle('compact-list', settings.compact);
+  if (optionCompact) {
+    optionCompact.checked = settings.compact;
+  }
+};
+
+const applyFilter = (items) => {
+  const query = filterInput?.value.trim().toLowerCase();
+  if (!query) {
+    return items;
+  }
+  return items.filter((item) => item.title.toLowerCase().includes(query));
+};
+
+const renderDefaultRoomOptions = () => {
+  if (!defaultRoomSelect) {
+    return;
+  }
+  defaultRoomSelect.innerHTML = '';
+  const rooms = Object.keys(settings.rooms);
+  rooms.forEach((roomId) => {
+    const option = document.createElement('option');
+    option.value = roomId;
+    option.textContent = roomId;
+    defaultRoomSelect.appendChild(option);
+  });
+  if (!rooms.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No lists yet';
+    defaultRoomSelect.appendChild(option);
+  }
+  defaultRoomSelect.value = settings.defaultRoom || room;
+};
+
+const renderVisitedRooms = () => {
+  if (!visitedRoomsContainer) {
+    return;
+  }
+  visitedRoomsContainer.innerHTML = '';
+  const rooms = Object.entries(settings.rooms).sort(
+    (a, b) => (b[1].lastVisited || 0) - (a[1].lastVisited || 0)
+  );
+  rooms.forEach(([roomId, data]) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'visited-room';
+    const header = document.createElement('div');
+    header.className = 'visited-room-header';
+    const name = document.createElement('div');
+    name.className = 'visited-room-name';
+    name.textContent = roomId;
+    const headerActions = document.createElement('div');
+    headerActions.className = 'visited-room-actions';
+    const status = document.createElement('span');
+    status.className = 'visited-room-status';
+    status.textContent = data.private ? 'Private' : 'Public';
+    if (data.private) {
+      status.classList.add('is-private');
+    }
+    const openButton = document.createElement('button');
+    openButton.className = 'ghost visited-room-open';
+    openButton.type = 'button';
+    openButton.textContent = 'Open';
+    openButton.addEventListener('click', () => {
+      window.location.href = `/r/${encodeURIComponent(roomId)}`;
+    });
+    headerActions.appendChild(status);
+    headerActions.appendChild(openButton);
+    header.appendChild(name);
+    header.appendChild(headerActions);
+    const toggleRow = document.createElement('label');
+    toggleRow.className = 'visited-room-toggle';
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.checked = Boolean(data.private);
+    toggle.addEventListener('change', () => {
+      data.private = toggle.checked;
+      if (data.private && !data.password) {
+        data.password = generatePassword();
+      }
+      if (!data.private) {
+        data.password = '';
+        data.authorized = true;
+      } else {
+        data.authorized = true;
+      }
+      settings.rooms[roomId] = data;
+      saveSettings();
+      updateRoomVisibilityBadge();
+      renderVisitedRooms();
+    });
+    const toggleText = document.createElement('span');
+    toggleText.textContent = 'Private list';
+    toggleRow.appendChild(toggle);
+    toggleRow.appendChild(toggleText);
+    const password = document.createElement('div');
+    password.className = 'visited-room-password';
+    password.textContent = data.private ? `Password: ${data.password}` : 'Password: —';
+    wrapper.appendChild(header);
+    wrapper.appendChild(toggleRow);
+    wrapper.appendChild(password);
+    visitedRoomsContainer.appendChild(wrapper);
+  });
+};
+
+const openOptionsModal = () => {
+  if (!optionsModal) {
+    return;
+  }
+  renderDefaultRoomOptions();
+  renderVisitedRooms();
+  optionsModal.classList.add('is-visible');
+  optionsModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeOptionsModal = () => {
+  if (!optionsModal) {
+    return;
+  }
+  optionsModal.classList.remove('is-visible');
+  optionsModal.setAttribute('aria-hidden', 'true');
+};
+
+const openShareModal = () => {
+  if (!shareModal) {
+    return;
+  }
+  const token = encodeShareToken({
+    room,
+    password: isRoomPrivate(room) ? getRoomPassword(room) : ''
+  });
+  const shareUrl = `${window.location.origin}/r/${encodeURIComponent(room)}?share=${token}`;
+  shareModalMessage.textContent = isRoomPrivate(room)
+    ? 'Sharing will include a secure token to access this private list.'
+    : 'This list is public. Share the link below.';
+  shareModal.dataset.shareUrl = shareUrl;
+  shareModal.classList.add('is-visible');
+  shareModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeShareModal = () => {
+  if (!shareModal) {
+    return;
+  }
+  shareModal.classList.remove('is-visible');
+  shareModal.setAttribute('aria-hidden', 'true');
+};
+
+const openPrivacyModal = () => {
+  if (!privacyModal) {
+    return;
+  }
+  privacyError?.setAttribute('hidden', '');
+  privacyPasswordInput.value = '';
+  privacyModal.classList.add('is-visible');
+  privacyModal.setAttribute('aria-hidden', 'false');
+  privacyPasswordInput?.focus();
+};
+
+const closePrivacyModal = () => {
+  if (!privacyModal) {
+    return;
+  }
+  privacyModal.classList.remove('is-visible');
+  privacyModal.setAttribute('aria-hidden', 'true');
+};
+
+const handleShareAction = (url) => {
+  if (navigator.share) {
+    navigator.share({ title: 'Shovo list', url }).catch(() => {
+      // no-op
+    });
+  }
 };
 
 const buildRatingHtml = (item) => {
@@ -480,6 +776,11 @@ const renderTrendingResults = (items) => {
 const renderList = (items) => {
   listResults.innerHTML = '';
   if (!items.length) {
+    const hasFilter = filterInput?.value.trim();
+    if (hasFilter && currentListItems.length) {
+      showStatus(listResults, 'No matches in this list.');
+      return;
+    }
     showStatus(
       listResults,
       activeTab === 'watched'
@@ -573,6 +874,11 @@ const debounceSearch = () => {
 };
 
 const loadList = async () => {
+  if (isRoomPrivate(room) && !isRoomAuthorized(room)) {
+    showStatus(listResults, 'This list is private. Enter the password to continue.');
+    openPrivacyModal();
+    return;
+  }
   showStatus(listResults, 'Loading list...');
   const page = pageState[activeTab];
   const response = await fetch(
@@ -589,7 +895,8 @@ const loadList = async () => {
     return;
   }
   totalPages[activeTab] = data.total_pages || 1;
-  renderList(data.items || []);
+  currentListItems = data.items || [];
+  renderList(applyFilter(currentListItems));
   if (listPageStatus) {
     listPageStatus.textContent = `Page ${pageState[activeTab]} of ${totalPages[activeTab]}`;
   }
@@ -855,13 +1162,73 @@ const setActiveTab = (nextTab) => {
   loadList();
 };
 
-searchButton.addEventListener('click', fetchSearch);
+const applyShareToken = () => {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get('share');
+  if (!token) {
+    return;
+  }
+  const payload = decodeShareToken(token);
+  if (!payload || !payload.room) {
+    return;
+  }
+  if (payload.room && payload.room !== room) {
+    window.location.href = `/r/${encodeURIComponent(payload.room)}?share=${token}`;
+    return;
+  }
+  ensureRoomState(room);
+  if (payload.password) {
+    settings.rooms[room].private = true;
+    settings.rooms[room].password = payload.password;
+    settings.rooms[room].authorized = true;
+    saveSettings();
+  }
+};
+
+const initializeSettings = () => {
+  settings = loadSettings();
+  ensureRoomState(room);
+  if (!settings.defaultRoom) {
+    settings.defaultRoom = room;
+  }
+  applyCompactSetting();
+  updateRoomVisibilityBadge();
+  updateRoomCount();
+  saveSettings();
+};
+
+const updateRoomLabel = () => {
+  updateRoomVisibilityBadge();
+  updateRoomCount();
+};
+
 searchInput.addEventListener('input', debounceSearch);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
     fetchSearch();
   }
+});
+filterInput?.addEventListener('input', () => {
+  renderList(applyFilter(currentListItems));
+});
+searchClearButton?.addEventListener('click', () => {
+  if (!searchInput) {
+    return;
+  }
+  searchInput.value = '';
+  lastSearchQuery = '';
+  lastSearchResults = [];
+  closeSearchModal();
+  searchInput.focus();
+});
+filterClearButton?.addEventListener('click', () => {
+  if (!filterInput) {
+    return;
+  }
+  filterInput.value = '';
+  renderList(applyFilter(currentListItems));
+  filterInput.focus();
 });
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && searchModal?.classList.contains('is-visible')) {
@@ -876,6 +1243,15 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && aboutModal?.classList.contains('is-visible')) {
     closeAboutModal();
   }
+  if (event.key === 'Escape' && shareModal?.classList.contains('is-visible')) {
+    closeShareModal();
+  }
+  if (event.key === 'Escape' && privacyModal?.classList.contains('is-visible')) {
+    closePrivacyModal();
+  }
+  if (event.key === 'Escape' && optionsModal?.classList.contains('is-visible')) {
+    closeOptionsModal();
+  }
 });
 document.addEventListener('click', (event) => {
   const target = event.target;
@@ -884,7 +1260,6 @@ document.addEventListener('click', (event) => {
     (searchModal?.contains(target) ||
       trendingPopover?.contains(target) ||
       searchInput.contains(target) ||
-      searchButton.contains(target) ||
       trendingButton?.contains(target))
   ) {
     return;
@@ -904,95 +1279,150 @@ aboutModal?.addEventListener('click', (event) => {
     closeAboutModal();
   }
 });
-if (changeListButton) {
-  const closeRenameModal = () => {
-    if (!renameModal) {
-      return;
-    }
-    renameModal.classList.remove('is-visible');
-    renameModal.setAttribute('aria-hidden', 'true');
-  };
-  const openRenameModal = () => {
-    if (!renameModal || !renameModalInput) {
-      return;
-    }
-    renameModalInput.value = room;
-    renameModal.classList.add('is-visible');
-    renameModal.setAttribute('aria-hidden', 'false');
-    renameModalInput.focus();
-    renameModalInput.select();
-  };
+roomTagButton?.addEventListener('click', openOptionsModal);
+trendingButton?.addEventListener('click', () => {
+  closeSearchModal();
+  if (trendingPopover?.classList.contains('is-visible')) {
+    closeTrendingPopover();
+    return;
+  }
+  fetchTrending();
+});
+refreshDatabaseButton?.addEventListener('click', async () => {
+  if (menu?.hasAttribute('open')) {
+    menu.removeAttribute('open');
+  }
+  openRefreshConfirmModal();
+});
+aboutOpenButton?.addEventListener('click', () => {
+  if (menu?.hasAttribute('open')) {
+    menu.removeAttribute('open');
+  }
+  openAboutModal();
+});
+appVersionTag?.addEventListener('click', openAboutModal);
+openOptionsButton?.addEventListener('click', () => {
+  if (menu?.hasAttribute('open')) {
+    menu.removeAttribute('open');
+  }
+  openOptionsModal();
+});
 
-  changeListButton.addEventListener('click', () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openRenameModal();
-  });
-  roomTagButton?.addEventListener('click', openRenameModal);
-  trendingButton?.addEventListener('click', () => {
-    closeSearchModal();
-    if (trendingPopover?.classList.contains('is-visible')) {
-      closeTrendingPopover();
-      return;
-    }
-    fetchTrending();
-  });
-  refreshDatabaseButton?.addEventListener('click', async () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openRefreshConfirmModal();
-  });
-  aboutOpenButton?.addEventListener('click', () => {
-    if (menu?.hasAttribute('open')) {
-      menu.removeAttribute('open');
-    }
-    openAboutModal();
-  });
-  aboutVersionButton?.addEventListener('click', openAboutModal);
+optionsModalClose?.addEventListener('click', closeOptionsModal);
+optionsModal?.addEventListener('click', (event) => {
+  if (event.target === optionsModal) {
+    closeOptionsModal();
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && optionsModal?.classList.contains('is-visible')) {
+    closeOptionsModal();
+  }
+});
+optionCompact?.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  settings.compact = target.checked;
+  applyCompactSetting();
+  saveSettings();
+});
+defaultRoomSelect?.addEventListener('change', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  settings.defaultRoom = target.value;
+  saveSettings();
+});
 
-  renameModalCancel?.addEventListener('click', closeRenameModal);
-  renameModalClose?.addEventListener('click', closeRenameModal);
-  renameModal?.addEventListener('click', (event) => {
-    if (event.target === renameModal) {
-      closeRenameModal();
-    }
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && renameModal?.classList.contains('is-visible')) {
-      closeRenameModal();
-    }
-  });
-  renameModalInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      renameModalConfirm?.click();
-    }
-  });
+shareRoomButton?.addEventListener('click', () => {
+  openShareModal();
+});
+shareModalClose?.addEventListener('click', closeShareModal);
+shareModal?.addEventListener('click', (event) => {
+  if (event.target === shareModal) {
+    closeShareModal();
+  }
+});
+shareCopyButton?.addEventListener('click', async () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    shareModalMessage.textContent = 'Copied to clipboard!';
+  } catch (error) {
+    shareModalMessage.textContent = 'Copy failed. Select the URL manually.';
+  }
+});
+shareEmailButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`mailto:?subject=Shovo list&body=${encodeURIComponent(url)}`, '_blank');
+});
+shareWhatsAppButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank');
+});
+shareMessengerButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://www.facebook.com/dialog/send?link=${encodeURIComponent(url)}`, '_blank');
+});
+shareTelegramButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}`, '_blank');
+});
+shareInstagramButton?.addEventListener('click', () => {
+  const url = shareModal?.dataset.shareUrl;
+  if (!url) {
+    return;
+  }
+  handleShareAction(url);
+  shareModalMessage.textContent = 'Instagram sharing isn’t direct. Copy the link and share it in the app.';
+});
 
-  renameModalConfirm?.addEventListener('click', async () => {
-    if (!renameModalInput) {
-      return;
-    }
-    const nextRoom = sanitizeRoom(renameModalInput.value);
-    if (!nextRoom || nextRoom === room) {
-      closeRenameModal();
-      return;
-    }
-    const response = await fetch('/api/list/rename', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ room, next_room: nextRoom })
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      alert(data.message || 'Unable to rename list.');
-      return;
-    }
-    window.location.href = `/r/${encodeURIComponent(nextRoom)}`;
-  });
-}
+privacyCancelButton?.addEventListener('click', () => {
+  closePrivacyModal();
+});
+privacyModal?.addEventListener('click', (event) => {
+  if (event.target === privacyModal) {
+    closePrivacyModal();
+  }
+});
+privacyUnlockButton?.addEventListener('click', () => {
+  if (!privacyPasswordInput) {
+    return;
+  }
+  const attempt = privacyPasswordInput.value.trim();
+  if (attempt && attempt === getRoomPassword(room)) {
+    settings.rooms[room].authorized = true;
+    saveSettings();
+    closePrivacyModal();
+    loadList();
+  } else {
+    privacyError?.removeAttribute('hidden');
+  }
+});
+privacyPasswordInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    privacyUnlockButton?.click();
+  }
+});
 
 refreshConfirmCancel?.addEventListener('click', closeRefreshConfirmModal);
 refreshConfirmClose?.addEventListener('click', closeRefreshConfirmModal);
@@ -1060,5 +1490,8 @@ listNext?.addEventListener('click', () => {
   }
 });
 
+initializeSettings();
+applyShareToken();
+updateRoomLabel();
 loadList();
 renderSearchResults([]);
