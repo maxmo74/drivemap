@@ -21,3 +21,9 @@ python app.py
 ```
 
 Then open `http://localhost:5000` and share the room URL.
+
+## Deployment documentation
+
+Domain-scoped deployment configuration lives in `domain.example.ext/`. See
+`domain.example.ext/README.md` for the uWSGI + Nginx setup on Debian/Ubuntu and the
+associated TLS/security headers.
