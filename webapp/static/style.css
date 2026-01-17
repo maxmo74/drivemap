@@ -771,17 +771,17 @@ button.ghost {
     align-items: center;
   }
 
-  /* Compact logo */
+  /* Compact logo - make it smaller on mobile */
   .logo {
     gap: 0.15rem;
   }
 
   .logo-text {
-    font-size: 1.3rem;
+    font-size: 1rem;
   }
 
   .logo-play {
-    font-size: 1.3rem;
+    font-size: 1rem;
   }
 
   .version-tag {
@@ -790,11 +790,9 @@ button.ghost {
     align-self: center;
   }
 
-  /* Compact room pill - inline with logo */
+  /* Hide room pill elements on mobile - keep only hamburger menu */
   .room-pill {
-    flex-wrap: nowrap;
-    gap: 0.25rem;
-    margin-top: 0;
+    display: none;
   }
 
   .room-label {
@@ -802,16 +800,11 @@ button.ghost {
   }
 
   .room-name {
-    font-size: 0.7rem;
-    max-width: 60px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
 
   .room-visibility {
-    font-size: 0.5rem;
-    padding: 0.1rem 0.3rem;
+    display: none;
   }
 
   .room-count {
@@ -819,8 +812,7 @@ button.ghost {
   }
 
   .share-button {
-    width: 24px;
-    height: 24px;
+    display: none;
   }
 
   .share-icon {
