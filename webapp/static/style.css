@@ -723,13 +723,18 @@ button.ghost {
     width: 100%;
     justify-content: center;
   }
+
+  /* Hide filter input on mobile, keep only search input */
+  .input-with-clear:first-child {
+    display: none;
+  }
 }
 
 @media (max-width: 768px) {
   header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   .app-header {
@@ -744,22 +749,48 @@ button.ghost {
   }
 
   .brand-row {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-  }
-
-  .room-pill {
-    flex-wrap: wrap;
+    flex-direction: row;
+    align-items: center;
     width: 100%;
     justify-content: space-between;
   }
 
+  .brand-top {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  .room-pill {
+    flex-wrap: nowrap;
+    width: auto;
+    justify-content: flex-start;
+    margin-top: 0.5rem;
+  }
+
   .room-count {
-    order: 1;
-    width: 100%;
-    text-align: left;
-    margin-top: 0.25rem;
+    order: 0;
+    width: auto;
+    text-align: right;
+    margin-top: 0;
+    margin-left: auto;
+  }
+
+  /* Make header more compact on mobile */
+  .logo-text {
+    font-size: 1.8rem;
+  }
+
+  .version-tag {
+    font-size: 0.6rem;
+  }
+
+  .room-label,
+  .room-visibility {
+    font-size: 0.65rem;
+  }
+
+  .room-name {
+    font-size: 0.85rem;
   }
 }
 
@@ -1262,6 +1293,24 @@ button.ghost {
     height: 32px;
     order: -1;
   }
+
+  /* Mobile search optimization - make search input full width */
+  .inline-search .input-with-clear:last-child {
+    flex: 1;
+    min-width: 100%;
+  }
+
+  /* Make search row more compact */
+  .search-row {
+    gap: 0.5rem;
+  }
+
+  /* Optimize trending button for mobile */
+  .trending-button {
+    width: auto;
+    padding: 0 0.5rem;
+    min-width: auto;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1274,93 +1323,151 @@ button.ghost {
   }
 
   header h1 {
-    font-size: 1.8rem;
-  }
-
-  .logo-text {
     font-size: 1.6rem;
   }
 
+  .logo-text {
+    font-size: 1.4rem;
+  }
+
   .version-tag {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
   }
 
   .room-name {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
   }
 
   .room-label,
   .room-visibility,
   .room-count {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
   }
 
   .input-with-clear input {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
   }
 
   .tab {
-    padding: 0.4rem 0.7rem;
-    font-size: 0.8rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
   }
 
   .tab-count {
-    font-size: 0.5rem;
-    padding: 0.05rem 0.25rem;
+    font-size: 0.4rem;
+    padding: 0.05rem 0.2rem;
   }
 
   .pagination-button {
-    min-width: 60px;
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
+    min-width: 50px;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.7rem;
   }
 
   .modal {
-    padding: 0.5rem;
-    gap: 0.6rem;
+    padding: 0.4rem;
+    gap: 0.5rem;
   }
 
   .modal-subtitle {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
   }
 
   .modal-body {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
+  }
+
+  /* Extra compact header for very small screens */
+  .brand-row {
+    gap: 0.3rem;
+  }
+
+  .room-pill {
+    gap: 0.3rem;
+  }
+
+  /* Make search input even more prominent on small screens */
+  .inline-search .input-with-clear:last-child {
+    min-width: 100%;
+  }
+
+  /* Optimize search row spacing */
+  .search-row {
+    gap: 0.4rem;
   }
 }
 
 @media (max-width: 360px) {
   main {
-    padding: 1rem 0.5rem 1.75rem;
+    padding: 0.8rem 0.4rem 1.5rem;
   }
 
   .card {
-    padding: 0.4rem;
+    padding: 0.3rem;
   }
 
   .card-body {
-    padding: 0.4rem;
+    padding: 0.3rem;
   }
 
   .card-action {
-    min-width: 36px;
-    height: 30px;
-    font-size: 0.7rem;
+    min-width: 32px;
+    height: 28px;
+    font-size: 0.6rem;
   }
 
   .card-drag-handle {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
   }
 
   .menu-panel {
-    min-width: 160px;
-    padding: 0.5rem 0.75rem;
+    min-width: 140px;
+    padding: 0.4rem 0.6rem;
   }
 
   .menu-action {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
+  }
+
+  /* Ultra-compact header for tiny screens */
+  .logo-text {
+    font-size: 1.2rem;
+  }
+
+  .version-tag {
+    font-size: 0.5rem;
+  }
+
+  /* Make room info even more compact */
+  .room-label,
+  .room-visibility,
+  .room-count {
+    font-size: 0.5rem;
+  }
+
+  .room-name {
+    font-size: 0.7rem;
+  }
+
+  /* Optimize search input for tiny screens */
+  .input-with-clear input {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  /* Make tabs more compact */
+  .tab {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.6rem;
+  }
+
+  /* Optimize pagination */
+  .pagination-button {
+    min-width: 40px;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.6rem;
   }
 }
 

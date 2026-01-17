@@ -98,7 +98,7 @@
 
     <template id="result-card-template">
       <article class="card">
-        <img class="card-image" alt="" />
+        <img class="card-image" alt="" loading="lazy" />
         <div class="card-body">
           <div class="card-info">
             <div class="card-title-row">
@@ -274,6 +274,18 @@
     <script>
       window.APP_ROOM = "{{ room }}";
     </script>
-    <script src="/static/app.js"></script>
+    <script type="module" src="/static/js/main.js"></script>
+    <script nomodule src="/static/app.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+          .then(function(registration) {
+            console.log('ServiceWorker registered:', registration.scope);
+          })
+          .catch(function(error) {
+            console.log('ServiceWorker registration failed:', error);
+          });
+      }
+    </script>
   </body>
 </html>
