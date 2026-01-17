@@ -614,8 +614,8 @@ button.ghost {
   font-size: 0.6rem;
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius);
-  background: rgba(148, 163, 184, 0.2);
-  color: var(--text-muted);
+  background: #dc2626;
+  color: #fff;
 }
 
 .compact-list .card {
