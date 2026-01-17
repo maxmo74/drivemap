@@ -1537,3 +1537,168 @@ applyShareToken();
 updateRoomLabel();
 loadList();
 renderSearchResults([]);
+
+// Mobile-specific enhancements
+function setupMobileEnhancements() {
+  // Check if we're on a mobile device
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  if (isMobile || isTouchDevice) {
+    // Add mobile class to body for additional styling
+    document.body.classList.add('is-mobile');
+
+    // Improve touch targets
+    const buttons = document.querySelectorAll('button, .card-action, .tab, .icon-button');
+    buttons.forEach(button => {
+      button.addEventListener('touchstart', function() {
+        this.classList.add('active-touch');
+      }, { passive: true });
+
+      button.addEventListener('touchend', function() {
+        this.classList.remove('active-touch');
+      }, { passive: true });
+
+      button.addEventListener('touchcancel', function() {
+        this.classList.remove('active-touch');
+      }, { passive: true });
+    });
+
+    // Add swipe gestures for card navigation
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipeGesture();
+    }, { passive: true });
+
+    function handleSwipeGesture() {
+      const swipeThreshold = 50;
+      const swipeDistance = touchStartX - touchEndX;
+
+      if (swipeDistance > swipeThreshold) {
+        // Left swipe - could be used for navigation
+        console.log('Left swipe detected');
+      } else if (swipeDistance < -swipeThreshold) {
+        // Right swipe - could be used for navigation
+        console.log('Right swipe detected');
+      }
+    }
+
+    // Add double-tap for quick actions
+    let lastTap = 0;
+    document.addEventListener('touchend', (e) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      
+      if (tapLength < 300 && tapLength > 0) {
+        // Double tap detected
+        const target = e.target.closest('.card');
+        if (target) {
+          // Could trigger a quick action on the card
+          console.log('Double tap on card');
+        }
+      }
+      
+      lastTap = currentTime;
+    }, { passive: true });
+
+    // Prevent zoom on double tap
+    document.addEventListener('dblclick', (e) => {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+      }
+    });
+
+    // Add pull-to-refresh functionality
+    let startY = 0;
+    let isPulling = false;
+
+    document.addEventListener('touchstart', (e) => {
+      if (window.scrollY === 0) {
+        startY = e.touches[0].clientY;
+        isPulling = true;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isPulling) return;
+      
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - startY;
+      
+      if (diff > 50) {
+        // Could trigger a refresh
+        console.log('Pull to refresh triggered');
+        isPulling = false;
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+      isPulling = false;
+    });
+
+    // Add mobile-specific event listeners
+    setupMobileEventListeners();
+  }
+
+  // Handle orientation changes
+  window.addEventListener('orientationchange', () => {
+    // Reload list to adapt to new orientation
+    setTimeout(() => {
+      loadList();
+    }, 300);
+  });
+
+  // Handle viewport changes
+  window.addEventListener('resize', () => {
+    // Debounce resize events
+    clearTimeout(window.resizeTimeout);
+    window.resizeTimeout = setTimeout(() => {
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        document.body.classList.add('is-mobile');
+      } else {
+        document.body.classList.remove('is-mobile');
+      }
+    }, 200);
+  });
+}
+
+function setupMobileEventListeners() {
+  // Add mobile-specific click handlers
+  const cards = document.querySelectorAll('.card');
+  cards.forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Check if click was on an action button
+      if (e.target.closest('.card-action, .card-drag-handle')) {
+        return; // Let the button handle the event
+      }
+      
+      // Mobile: tap on card could open details or toggle selection
+      console.log('Card tapped:', card.dataset.titleId);
+    });
+  });
+
+  // Improve modal behavior on mobile
+  const modals = document.querySelectorAll('.modal-overlay');
+  modals.forEach(modal => {
+    modal.addEventListener('touchmove', (e) => {
+      // Prevent scrolling when modal is open
+      if (modal.classList.contains('is-visible')) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  });
+}
+
+// Initialize mobile enhancements when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupMobileEnhancements);
+} else {
+  setupMobileEnhancements();
+}
