@@ -1,5 +1,9 @@
 """WSGI entry point for the application."""
-from webapp import app
+# Support both package and standalone imports
+try:
+    from webapp import app
+except ImportError:
+    from app import app
 
 application = app
 

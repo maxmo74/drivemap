@@ -7,7 +7,11 @@ from typing import Any
 
 from flask import request
 
-from .models import SearchResult
+# Support both package and standalone imports
+try:
+    from .models import SearchResult
+except ImportError:
+    from models import SearchResult
 
 DEFAULT_USER_AGENT = "shovo-movielist/1.0 (+https://example.com)"
 

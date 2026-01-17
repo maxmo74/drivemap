@@ -7,15 +7,27 @@ from typing import Any, Iterable
 
 import requests
 
-from .database import (
-    get_db_context,
-    metadata_cache_get,
-    metadata_cache_set,
-    migrate_db,
-    rating_cache_get,
-    rating_cache_set,
-)
-from .models import SearchResult
+# Support both package and standalone imports
+try:
+    from .database import (
+        get_db_context,
+        metadata_cache_get,
+        metadata_cache_set,
+        migrate_db,
+        rating_cache_get,
+        rating_cache_set,
+    )
+    from .models import SearchResult
+except ImportError:
+    from database import (
+        get_db_context,
+        metadata_cache_get,
+        metadata_cache_set,
+        migrate_db,
+        rating_cache_get,
+        rating_cache_set,
+    )
+    from models import SearchResult
 
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/{first}/{query}.json"
 IMDB_TITLE_URL = "https://www.imdb.com/title/{title_id}/"

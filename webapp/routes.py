@@ -7,25 +7,47 @@ from typing import Any
 import requests
 from flask import Blueprint, jsonify, redirect, render_template, request
 
-from .database import get_db, get_db_context, migrate_db
-from .external_api import (
-    ALLOWED_TYPE_LABELS,
-    MAX_RESULTS,
-    fetch_suggestions,
-    fetch_trending,
-    get_metadata,
-    get_ratings,
-    normalize_type_label,
-    refresh_title_details,
-)
-from .utils import (
-    default_room,
-    parse_watched,
-    request_user_agent,
-    room_from_request,
-    sanitize_room,
-    serialize_result,
-)
+# Support both package and standalone imports
+try:
+    from .database import get_db, get_db_context, migrate_db
+    from .external_api import (
+        ALLOWED_TYPE_LABELS,
+        MAX_RESULTS,
+        fetch_suggestions,
+        fetch_trending,
+        get_metadata,
+        get_ratings,
+        normalize_type_label,
+        refresh_title_details,
+    )
+    from .utils import (
+        default_room,
+        parse_watched,
+        request_user_agent,
+        room_from_request,
+        sanitize_room,
+        serialize_result,
+    )
+except ImportError:
+    from database import get_db, get_db_context, migrate_db
+    from external_api import (
+        ALLOWED_TYPE_LABELS,
+        MAX_RESULTS,
+        fetch_suggestions,
+        fetch_trending,
+        get_metadata,
+        get_ratings,
+        normalize_type_label,
+        refresh_title_details,
+    )
+    from utils import (
+        default_room,
+        parse_watched,
+        request_user_agent,
+        room_from_request,
+        sanitize_room,
+        serialize_result,
+    )
 
 APP_VERSION = "1.6.2"
 DEFAULT_ROOM_COOKIE = "shovo_default_room"

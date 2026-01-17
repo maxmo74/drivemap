@@ -4,25 +4,30 @@ import os
 
 from flask import Flask
 
-from .database import close_db, init_db
-from .routes import bp as main_bp
+# Support both package and standalone imports
+try:
+    from .database import close_db, init_db
+    from .routes import bp as main_bp
+except ImportError:
+    from database import close_db, init_db
+    from routes import bp as main_bp
 
 
 def create_app() -> Flask:
     """Create and configure the Flask application."""
-    app = Flask(__name__)
+    application = Flask(__name__)
 
     # Register teardown to close database connections
-    app.teardown_appcontext(close_db)
+    application.teardown_appcontext(close_db)
 
     # Register blueprints
-    app.register_blueprint(main_bp)
+    application.register_blueprint(main_bp)
 
     # Initialize database on first request
-    with app.app_context():
+    with application.app_context():
         init_db()
 
-    return app
+    return application
 
 
 app = create_app()
