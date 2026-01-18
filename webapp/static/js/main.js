@@ -27,7 +27,7 @@ import {
   getRefreshStatus,
   MAX_RESULTS
 } from './api.js';
-import { buildCard, applyCardDetails, needsDetails } from './cards.js';
+import { buildCard, buildMobileSearchResult, applyCardDetails, needsDetails } from './cards.js';
 import { attachDragHandlers, getCurrentOrder } from './drag.js';
 import { setupMobileEnhancements } from './mobile.js';
 import { getCached, setCached, getDetailCacheKey } from './cache.js';
@@ -295,11 +295,29 @@ const renderSearchResults = (items) => {
   const limited = items.slice(0, MAX_RESULTS);
   if (!limited.length) return;
   openSearchModal();
-  limited.forEach((item) => {
-    const card = buildCard(item, 'search', cardTemplate, cardHandlers);
-    searchResults.appendChild(card);
-    requestDetails(item, card);
-  });
+  
+  // Check if we should use mobile layout
+  const isMobileLayout = window.matchMedia('(max-width: 768px)').matches;
+  const mobileTemplate = document.getElementById('mobile-search-card-template');
+  
+  if (isMobileLayout && mobileTemplate) {
+    // Use mobile compact layout
+    searchResults.classList.add('mobile-view');
+    limited.forEach((item) => {
+      const mobileResult = buildMobileSearchResult(item, mobileTemplate, (selectedItem) => {
+        cardHandlers.onAdd(selectedItem, false);
+      });
+      searchResults.appendChild(mobileResult);
+    });
+  } else {
+    // Use desktop layout
+    searchResults.classList.remove('mobile-view');
+    limited.forEach((item) => {
+      const card = buildCard(item, 'search', cardTemplate, cardHandlers);
+      searchResults.appendChild(card);
+      requestDetails(item, card);
+    });
+  }
 };
 
 const renderTrendingResults = (items) => {
@@ -956,4 +974,7 @@ loadList();
 renderSearchResults([]);
 
 // Setup mobile enhancements
-setupMobileEnhancements(loadList);
+setupMobileEnhancements(loadList, {
+  setActiveTab: setActiveTab,
+  activeTab: activeTab
+});

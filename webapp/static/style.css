@@ -770,6 +770,7 @@ button.ghost {
     align-items: center;
     gap: 0.5rem;
     flex-wrap: nowrap;
+    width: 100%;
   }
 
   .app-header {
@@ -777,6 +778,7 @@ button.ghost {
     align-items: center;
     flex-wrap: nowrap;
     width: 100%;
+    justify-content: space-between;
   }
 
   .header-actions {
@@ -784,6 +786,8 @@ button.ghost {
     flex-wrap: nowrap;
     gap: 0.4rem;
     margin-left: auto;
+    display: flex;
+    align-items: center;
   }
 
   .brand-row {
@@ -822,6 +826,8 @@ button.ghost {
   /* Show room-name on mobile, consistent with desktop */
   .room-pill {
     display: flex;
+    align-items: center;
+    gap: 0.3rem;
   }
 
   .room-name {
@@ -830,13 +836,18 @@ button.ghost {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 600;
   }
 
-  /* Make menu button slightly larger */
+  /* Make menu button slightly larger for better touch targets */
   .menu summary {
-    width: 32px;
-    height: 32px;
-    padding: 0.3rem;
+    width: 36px;
+    height: 36px;
+    padding: 0.4rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .share-icon {
@@ -844,11 +855,14 @@ button.ghost {
     height: 12px;
   }
 
-  /* Compact menu */
-  .menu summary {
-    width: 28px;
-    height: 28px;
-    padding: 0.25rem;
+  /* Show share button on mobile */
+  .share-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
   }
 }
 
@@ -1341,15 +1355,17 @@ button.ghost {
 
   .card-action {
     flex: 1 1 40px;
-    min-width: 40px;
-    height: 32px;
+    min-width: 44px;
+    height: 36px;
     font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
   }
 
   .card-drag-handle {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     order: -1;
+    flex-shrink: 0;
   }
 
   /* Mobile search optimization - make search input full width */
@@ -1361,6 +1377,7 @@ button.ghost {
   /* Make search row more compact */
   .search-row {
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   /* Optimize trending button for mobile */
@@ -1368,6 +1385,153 @@ button.ghost {
     width: auto;
     padding: 0 0.5rem;
     min-width: auto;
+    flex-shrink: 0;
+  }
+
+  /* Mobile-specific search layout - full width search bar */
+  @media (max-width: 768px) {
+    .list-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .search-row {
+      width: 100%;
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 0.5rem;
+    }
+
+    /* Make search input take all available space between tabs and trending button */
+    .inline-search {
+      flex: 1;
+      min-width: 0;
+    }
+
+    #search-input {
+      width: 100%;
+      min-width: 0;
+    }
+
+    /* Hide filter input on mobile to save space - users can use search */
+    #filter-input,
+    #filter-clear {
+      display: none;
+    }
+  }
+
+  /* Mobile-specific compact search results */
+  .mobile-search-result {
+    display: none; /* Hidden by default */
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--surface-strong);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.1s ease, background 0.1s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mobile-search-result:hover,
+  .mobile-search-result:focus {
+    background: rgba(var(--accent-rgb), 0.1);
+    transform: translateY(-1px);
+  }
+
+  .mobile-search-result:active {
+    transform: scale(0.98);
+  }
+
+  .mobile-search-image {
+    width: 40px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: calc(var(--radius) * 0.5);
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .mobile-search-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+
+  .mobile-search-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .mobile-search-title {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    color: var(--text-soft);
+  }
+
+  .mobile-search-year {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .mobile-search-rating-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .mobile-search-imdb,
+  .mobile-search-rotten {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+  }
+
+  .mobile-search-imdb::before {
+    content: "🍿";
+    font-size: 0.8rem;
+  }
+
+  .mobile-search-rotten::before {
+    content: "🍅";
+    font-size: 0.8rem;
+  }
+
+  /* Show mobile search results only on mobile */
+  @media (max-width: 768px) {
+    .mobile-search-result {
+      display: flex;
+    }
+
+    /* Hide regular search results on mobile */
+    #search-results .card {
+      display: none;
+    }
+
+    /* Show mobile search results container */
+    #search-results.mobile-view {
+      display: block;
+    }
   }
 }
 
@@ -1409,8 +1573,8 @@ button.ghost {
   }
 
   .share-button {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
   }
 
   .share-icon {
@@ -1419,9 +1583,9 @@ button.ghost {
   }
 
   .menu summary {
-    width: 24px;
-    height: 24px;
-    padding: 0.2rem;
+    width: 28px;
+    height: 28px;
+    padding: 0.25rem;
   }
 
   /* Compact search */
@@ -1495,19 +1659,21 @@ button.ghost {
   }
 
   .card-action {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     font-size: 0.8rem;
+    min-width: 44px;
   }
 
   .card-drag-handle {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     font-size: 0.9rem;
   }
 
   .card-row-actions {
     gap: 0.35rem;
+    padding-top: 0.25rem;
   }
 
   /* Compact pagination */
@@ -1750,12 +1916,88 @@ body.is-mobile .card:active {
 body.is-mobile .active-touch {
   transform: scale(0.95);
   opacity: 0.9;
+  transition: transform 0.05s ease, opacity 0.05s ease;
 }
 
 body.is-mobile .card-action:active,
 body.is-mobile .tab:active,
 body.is-mobile button:active {
   transform: scale(0.97);
+  opacity: 0.85;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+/* Improved mobile button sizes */
+body.is-mobile .icon-button,
+body.is-mobile .menu summary {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+/* Tooltip styling */
+.tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip::after {
+  content: attr(aria-label);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.3rem 0.6rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  color: var(--text-soft);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.tooltip:hover::after,
+.tooltip:focus::after {
+  opacity: 1;
+}
+
+/* Mobile tooltips - show on tap instead of hover */
+@media (hover: none) and (pointer: coarse) {
+  .tooltip::after {
+    opacity: 0;
+    transition: opacity 0.1s ease;
+  }
+  
+  .tooltip.active-touch::after {
+    opacity: 1;
+  }
+}
+
+/* Add tooltips to all interactive elements */
+.card-action,
+.icon-button,
+.tab,
+.menu summary,
+.icon-button,
+.trending-button,
+.share-button,
+.room-tag {
+  position: relative;
+}
+
+.card-action[title],
+.icon-button[title],
+.tab[title],
+.menu summary[title],
+.trending-button[title],
+.share-button[title],
+.room-tag[title] {
+  cursor: pointer;
 }
 
 /* Mobile modal optimizations */

@@ -111,16 +111,33 @@
             </div>
           </div>
           <div class="card-row-actions">
-            <button class="card-action primary">Add</button>
-            <button class="card-action secondary">Watched</button>
+            <button class="card-action primary" aria-label="Add to watchlist" title="Add to watchlist">Add</button>
+            <button class="card-action secondary" aria-label="Add as watched" title="Add as watched">Watched</button>
             <button class="card-action neutral card-action-top" type="button" aria-label="Move to top" title="Move to top">
               △
             </button>
-            <button class="card-action danger">Remove</button>
-            <button class="card-drag-handle" type="button" aria-label="Drag to reorder">☰</button>
+            <button class="card-action danger" aria-label="Remove from list" title="Remove from list">Remove</button>
+            <button class="card-drag-handle" type="button" aria-label="Drag to reorder" title="Drag to reorder">☰</button>
           </div>
         </div>
       </article>
+    </template>
+
+    <!-- Mobile-specific compact search result template -->
+    <template id="mobile-search-card-template">
+      <button class="mobile-search-result" type="button">
+        <img class="mobile-search-image" alt="" loading="lazy" />
+        <div class="mobile-search-info">
+          <div class="mobile-search-title-row">
+            <h4 class="mobile-search-title"></h4>
+            <span class="mobile-search-year"></span>
+          </div>
+          <div class="mobile-search-rating-row">
+            <div class="mobile-search-imdb"></div>
+            <div class="mobile-search-rotten"></div>
+          </div>
+        </div>
+      </button>
     </template>
 
     <div class="modal-overlay" id="refresh-confirm-modal" aria-hidden="true" role="dialog" aria-modal="true">

@@ -107,7 +107,24 @@ function handleSwipeGesture(startX, endX) {
 
   if (Math.abs(swipeDistance) < swipeThreshold) return;
 
-  // Swipe gestures can be used for tab navigation in the future
+  // Use global variables for tab navigation
+  const currentTab = window.mobileActiveTab || 'unwatched';
+  const setActiveTab = window.mobileSetActiveTab;
+
+  if (!setActiveTab) return;
+
+  // Swipe left to right (right swipe) - navigate to previous tab
+  if (swipeDistance > swipeThreshold) {
+    if (currentTab === 'watched') {
+      setActiveTab('unwatched');
+    }
+  }
+  // Swipe right to left (left swipe) - navigate to next tab
+  else if (swipeDistance < -swipeThreshold) {
+    if (currentTab === 'unwatched') {
+      setActiveTab('watched');
+    }
+  }
 }
 
 /**
@@ -127,6 +144,23 @@ function setupDoubleTapPrevention() {
 function setupPullToRefresh() {
   let startY = 0;
   let isPulling = false;
+  let pullDistance = 0;
+  const pullThreshold = 100;
+  const pullElement = document.createElement('div');
+  pullElement.className = 'pull-to-refresh';
+  pullElement.textContent = '🔄 Pull to refresh';
+  pullElement.style.position = 'fixed';
+  pullElement.style.top = '-50px';
+  pullElement.style.left = '0';
+  pullElement.style.width = '100%';
+  pullElement.style.textAlign = 'center';
+  pullElement.style.padding = '10px';
+  pullElement.style.background = 'var(--surface-strong)';
+  pullElement.style.color = 'var(--text-soft)';
+  pullElement.style.transition = 'top 0.2s ease';
+  pullElement.style.zIndex = '1000';
+  pullElement.style.fontSize = '0.8rem';
+  document.body.appendChild(pullElement);
 
   document.addEventListener(
     'touchstart',
@@ -134,6 +168,7 @@ function setupPullToRefresh() {
       if (window.scrollY === 0) {
         startY = e.touches[0].clientY;
         isPulling = true;
+        pullDistance = 0;
       }
     },
     { passive: true }
@@ -144,17 +179,31 @@ function setupPullToRefresh() {
     (e) => {
       if (!isPulling) return;
       const currentY = e.touches[0].clientY;
-      const diff = currentY - startY;
+      pullDistance = currentY - startY;
 
-      if (diff > 80 && loadListCallback) {
-        isPulling = false;
-        loadListCallback();
+      if (pullDistance > 0) {
+        e.preventDefault(); // Prevent scrolling while pulling
+        const progress = Math.min(pullDistance / pullThreshold, 1);
+        pullElement.textContent = pullDistance >= pullThreshold ? '🔄 Release to refresh' : '🔄 Pull to refresh';
+        pullElement.style.top = `${Math.min(pullDistance - 50, 50)}px`;
       }
     },
-    { passive: true }
+    { passive: false }
   );
 
   document.addEventListener('touchend', () => {
+    if (isPulling && pullDistance >= pullThreshold && loadListCallback) {
+      pullElement.textContent = '🔄 Refreshing...';
+      pullElement.style.top = '0';
+      setTimeout(() => {
+        loadListCallback();
+        setTimeout(() => {
+          pullElement.style.top = '-50px';
+        }, 500);
+      }, 300);
+    } else {
+      pullElement.style.top = '-50px';
+    }
     isPulling = false;
   });
 }
@@ -192,9 +241,19 @@ function setupResizeHandler() {
 /**
  * Initialize mobile enhancements
  * @param {Function} loadList - Callback to reload list
+ * @param {Object} options - Additional options
+ * @param {Function} options.setActiveTab - Function to set active tab
+ * @param {string} options.activeTab - Current active tab
  */
-export function setupMobileEnhancements(loadList) {
+export function setupMobileEnhancements(loadList, options = {}) {
   loadListCallback = loadList;
+
+  if (options.setActiveTab) {
+    window.mobileSetActiveTab = options.setActiveTab;
+  }
+  if (options.activeTab) {
+    window.mobileActiveTab = options.activeTab;
+  }
 
   if (isMobile() || isTouchDevice()) {
     document.body.classList.add('is-mobile');

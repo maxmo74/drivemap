@@ -38,8 +38,14 @@ def app():
 
     # Cleanup
     database.DB_PATH = original_db_path
-    os.close(TEST_DB_FD)
-    os.unlink(TEST_DB_PATH)
+    try:
+        os.close(TEST_DB_FD)
+    except OSError:
+        pass  # File descriptor may already be closed
+    try:
+        os.unlink(TEST_DB_PATH)
+    except FileNotFoundError:
+        pass  # File may already be deleted
 
 
 @pytest.fixture

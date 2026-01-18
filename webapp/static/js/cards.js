@@ -148,6 +148,63 @@ export function needsDetails(item) {
 }
 
 /**
+ * Build mobile search result
+ * @param {object} item - Item data
+ * @param {HTMLTemplateElement} template - Mobile template element
+ * @param {Function} onAdd - Add handler function
+ * @returns {HTMLElement} - Mobile search result element
+ */
+export function buildMobileSearchResult(item, template, onAdd) {
+  const fragment = template.content.cloneNode(true);
+  const button = fragment.querySelector('.mobile-search-result');
+  const image = fragment.querySelector('.mobile-search-image');
+  const title = fragment.querySelector('.mobile-search-title');
+  const year = fragment.querySelector('.mobile-search-year');
+  const imdbRating = fragment.querySelector('.mobile-search-imdb');
+  const rottenRating = fragment.querySelector('.mobile-search-rotten');
+
+  // Set basic info
+  button.dataset.titleId = item.title_id;
+  button.dataset.typeLabel = item.type_label || '';
+  
+  // Set image
+  image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
+  image.alt = `${item.title} poster`;
+  image.loading = 'lazy';
+
+  // Set title and year
+  title.textContent = item.title;
+  if (item.year) {
+    year.textContent = item.year;
+  } else {
+    year.style.display = 'none';
+  }
+
+  // Set ratings if available
+  if (item.rating) {
+    imdbRating.textContent = item.rating;
+  } else {
+    imdbRating.style.display = 'none';
+  }
+
+  if (item.rotten_tomatoes) {
+    rottenRating.textContent = item.rotten_tomatoes;
+  } else {
+    rottenRating.style.display = 'none';
+  }
+
+  // Add click handler to add item when clicked
+  if (onAdd) {
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      onAdd(item, false);
+    });
+  }
+
+  return button;
+}
+
+/**
  * Build a card element from an item
  * @param {object} item - Item data
  * @param {string} mode - Mode ('search' or 'list')

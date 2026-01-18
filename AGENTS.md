@@ -34,12 +34,21 @@ This document outlines the operating guidelines and permissions for AI agents wo
 2. **Proposal Phase**: Present clear, detailed plans with expected outcomes
 3. **Review Phase**: Show diffs and explain rationale for changes
 4. **Execution Phase**: Implement changes only after explicit user approval
+5. **Version Management**: After task completion, bump patch version, commit changes, and push to repository
 
 ### Communication Protocol
 
 1. **Status Updates**: Provide regular progress updates
 2. **Error Reporting**: Immediately report any issues or unexpected behavior
 3. **Completion Notification**: Clearly indicate when tasks are complete
+4. **Version Tracking**: Document version changes and commit messages for transparency
+
+### Version Management Process
+
+1. **Patch Version Bump**: Increment patch version (X.Y.Z → X.Y.Z+1) for bug fixes and minor improvements
+2. **Commit Changes**: Create descriptive commit messages following conventional commits format
+3. **Push Updates**: Push changes to remote repository after successful testing
+4. **Documentation**: Update version references in documentation and changelogs
 
 ## Mobile UX/UI Focus Areas
 
