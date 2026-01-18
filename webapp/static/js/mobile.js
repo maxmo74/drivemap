@@ -97,7 +97,7 @@ function setupSwipeGestures() {
 }
 
 /**
- * Handle swipe gesture
+ * Handle swipe gesture for tab navigation
  * @param {number} startX - Start X position
  * @param {number} endX - End X position
  */
@@ -125,6 +125,130 @@ function handleSwipeGesture(startX, endX) {
       setActiveTab('watched');
     }
   }
+}
+
+// Export card swipe setup function for direct use
+export function setupCardSwipeGestures(onRemove, onToggle) {
+  setupCardSwipeGestures(onRemove, onToggle);
+}
+
+/**
+ * Setup swipe gestures for individual cards
+ * @param {Function} onRemove - Callback for remove action
+ * @param {Function} onToggle - Callback for toggle action
+ */
+function setupCardSwipeGestures(onRemove, onToggle) {
+  const cards = document.querySelectorAll('.card');
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let currentCard = null;
+  let isSwiping = false;
+  let swipeDirection = null;
+
+  cards.forEach(card => {
+    // Skip setup if already configured
+    if (card.dataset.swipeSetup) return;
+    card.dataset.swipeSetup = 'true';
+
+    card.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      currentCard = card;
+      isSwiping = false;
+      swipeDirection = null;
+      
+      // Store initial position
+      card.dataset.startX = touchStartX;
+      card.dataset.startY = touchStartY;
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      if (!currentCard || !touchStartX) return;
+      
+      const touchCurrentX = e.touches[0].clientX;
+      const touchCurrentY = e.touches[0].clientY;
+      const deltaX = touchCurrentX - touchStartX;
+      const deltaY = touchCurrentY - touchStartY;
+
+      // Only consider horizontal swipes
+      if (Math.abs(deltaX) < Math.abs(deltaY)) {
+        isSwiping = false;
+        return;
+      }
+
+      // Determine swipe direction
+      if (Math.abs(deltaX) > 10) {
+        isSwiping = true;
+        swipeDirection = deltaX > 0 ? 'right' : 'left';
+        
+        // Visual feedback
+        if (swipeDirection === 'left') {
+          card.style.transform = `translateX(${deltaX}px)`;
+          card.style.opacity = Math.max(0.5, 1 - Math.abs(deltaX) / 100);
+        } else if (swipeDirection === 'right') {
+          card.style.transform = `translateX(${deltaX}px)`;
+          card.style.opacity = Math.max(0.5, 1 - Math.abs(deltaX) / 100);
+        }
+      }
+    }, { passive: false });
+
+    card.addEventListener('touchend', (e) => {
+      if (!currentCard || !isSwiping || !swipeDirection) {
+        // Reset state
+        if (currentCard) {
+          currentCard.style.transform = '';
+          currentCard.style.opacity = '';
+        }
+        currentCard = null;
+        touchStartX = 0;
+        touchStartY = 0;
+        isSwiping = false;
+        swipeDirection = null;
+        return;
+      }
+
+      const touchEndX = e.changedTouches[0].clientX;
+      const swipeDistance = touchEndX - touchStartX;
+      const swipeThreshold = 80; // Require larger swipe for action
+
+      // Reset visual state
+      currentCard.style.transform = '';
+      currentCard.style.opacity = '';
+
+      // Determine which list we're in
+      const activeTab = document.querySelector('.tab.active');
+      const isWatchlist = activeTab && activeTab.id === 'tab-watchlist';
+      const isWatched = activeTab && activeTab.id === 'tab-watched';
+
+      // Handle swipe actions
+      if (Math.abs(swipeDistance) >= swipeThreshold) {
+        if (swipeDirection === 'left') {
+          // Left swipe - remove from current list
+          if (onRemove) {
+            const titleId = currentCard.dataset.titleId;
+            onRemove(titleId);
+          }
+        } else if (swipeDirection === 'right') {
+          // Right swipe - toggle between watchlist/watched
+          if (onToggle) {
+            const titleId = currentCard.dataset.titleId;
+            const currentStatus = isWatchlist ? 'watchlist' : 'watched';
+            const newStatus = currentStatus === 'watchlist' ? 'watched' : 'watchlist';
+            onToggle(titleId, newStatus);
+          }
+        }
+      }
+
+      // Reset state
+      currentCard = null;
+      touchStartX = 0;
+      touchStartY = 0;
+      isSwiping = false;
+      swipeDirection = null;
+    }, { passive: true });
+  });
 }
 
 /**
@@ -262,6 +386,11 @@ export function setupMobileEnhancements(loadList, options = {}) {
     setupDoubleTapPrevention();
     setupPullToRefresh();
     setupMobileEventListeners();
+    
+    // Setup card swipe gestures if callbacks are provided
+    if (options.onCardRemove || options.onCardToggle) {
+      setupCardSwipeGestures(options.onCardRemove, options.onCardToggle);
+    }
   }
 
   setupOrientationHandler();

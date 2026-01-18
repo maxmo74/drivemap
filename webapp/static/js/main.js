@@ -989,5 +989,29 @@ renderSearchResults([]);
 // Setup mobile enhancements
 setupMobileEnhancements(loadList, {
   setActiveTab: setActiveTab,
-  activeTab: activeTab
+  activeTab: activeTab,
+  onCardRemove: async (titleId) => {
+    try {
+      // Find the item in the current list
+      const item = currentListItems.find(item => item.title_id === titleId);
+      if (item) {
+        await apiRemoveFromList(room, titleId);
+        await loadList();
+      }
+    } catch (error) {
+      alert('Failed to remove item.');
+    }
+  },
+  onCardToggle: async (titleId) => {
+    try {
+      // Find the item in the current list
+      const item = currentListItems.find(item => item.title_id === titleId);
+      if (item) {
+        await updateWatched(room, titleId, !item.watched);
+        await loadList();
+      }
+    } catch (error) {
+      alert('Failed to toggle item.');
+    }
+  }
 });

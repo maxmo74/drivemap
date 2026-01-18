@@ -55,7 +55,6 @@ export function buildMetaText(item) {
   const metaParts = [];
   const displayLabel = labelMap[normalizedType] || (item.type_label || '').toUpperCase();
   if (displayLabel) metaParts.push(displayLabel);
-  if (item.year) metaParts.push(item.year);
   if (item.original_language) metaParts.push(item.original_language);
 
   const runtimeMinutes = Number(item.runtime_minutes);
@@ -127,8 +126,16 @@ export function buildRatingHtml(item) {
 export function applyCardDetails(article, item) {
   const meta = article.querySelector('.card-meta');
   const rating = article.querySelector('.card-rating');
+  const year = article.querySelector('.card-year');
+  
   if (meta) meta.textContent = buildMetaText(item);
   if (rating) rating.innerHTML = buildRatingHtml(item);
+  if (year) {
+    year.textContent = item.year || '';
+    if (!item.year) {
+      year.style.display = 'none';
+    }
+  }
 }
 
 /**
