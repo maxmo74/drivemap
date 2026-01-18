@@ -163,6 +163,7 @@ header h1 {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
+  display: none;
 }
 
 .room-visibility {
@@ -183,12 +184,14 @@ header h1 {
 .room-count {
   font-size: 0.75rem;
   color: var(--text-muted);
+  display: none;
 }
 
 .share-button {
   width: var(--control-size);
   height: var(--control-size);
   padding: 0;
+  display: none;
 }
 
 .share-icon {
@@ -225,6 +228,12 @@ header h1 {
 .search-container {
   position: relative;
   align-items: stretch;
+}
+
+/* Hide filter input on desktop - users can search instead */
+#filter-input,
+#filter-clear {
+  display: none;
 }
 
 .header-actions {
@@ -356,11 +365,15 @@ button.ghost {
 }
 
 .pagination {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
   margin-top: 1.25rem;
+}
+
+.pagination.visible {
+  display: flex;
 }
 
 .pagination-button {
@@ -794,29 +807,17 @@ button.ghost {
     align-self: center;
   }
 
-  /* Hide room pill elements on mobile - keep only hamburger menu */
+  /* Show room-name on mobile, consistent with desktop */
   .room-pill {
-    display: none;
-  }
-
-  .room-label {
-    display: none;
+    display: flex;
   }
 
   .room-name {
-    display: none;
-  }
-
-  .room-visibility {
-    display: none;
-  }
-
-  .room-count {
-    display: none;
-  }
-
-  .share-button {
-    display: none;
+    font-size: 0.7rem;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .share-icon {
