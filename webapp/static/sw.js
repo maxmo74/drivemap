@@ -1,6 +1,6 @@
-const CACHE_NAME = 'shovo-v1.6.15';
-const STATIC_CACHE = 'shovo-static-v1.6.15';
-const API_CACHE = 'shovo-api-v1.6.15';
+const CACHE_NAME = 'shovo-v1.6.16';
+const STATIC_CACHE = 'shovo-static-v1.6.16';
+const API_CACHE = 'shovo-api-v1.6.16';
 
 const STATIC_ASSETS = [
   '/',
