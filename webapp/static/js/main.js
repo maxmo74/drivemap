@@ -326,6 +326,7 @@ const renderTrendingResults = (items) => {
   if (!limited.length) return;
   openTrendingPopover();
   const isMobileLayout = window.matchMedia('(max-width: 768px)').matches;
+  const mobileTemplate = document.getElementById('mobile-search-card-template');
   
   if (isMobileLayout && mobileTemplate) {
     // Use mobile compact layout for trending results

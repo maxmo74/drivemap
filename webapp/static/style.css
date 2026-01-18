@@ -1364,46 +1364,9 @@ button.ghost {
     grid-template-columns: 1fr;
   }
 
-  .card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .card-image {
-    width: 100%;
-    height: 160px;
-    min-width: 100%;
-  }
-
-  .card-body {
-    padding: 0.5rem;
-    flex-direction: column;
-  }
-
-  .card-info {
-    width: 100%;
-  }
-
-  .card-row-actions {
-    width: 100%;
-    justify-content: space-between;
-    flex-wrap: wrap;
-  }
-
-  .card-action {
-    flex: 1 1 40px;
-    min-width: 44px;
-    height: 36px;
-    font-size: 0.75rem;
-    padding: 0.2rem 0.4rem;
-  }
-
-  .card-drag-handle {
-    width: 36px;
-    height: 36px;
-    order: -1;
-    flex-shrink: 0;
-  }
+  /* Keep the compact mobile layout from 700px breakpoint */
+  /* Remove the conflicting column layout that was overriding mobile design */
+}
 
   /* Mobile search optimization - make search input full width */
   .inline-search .input-with-clear:last-child {
@@ -1576,8 +1539,8 @@ button.ghost {
       display: flex;
     }
 
-    /* Hide regular search results on mobile */
-    #search-results .card {
+    /* Hide regular search results on mobile when mobile view is active */
+    #search-results.mobile-view .card {
       display: none;
     }
 
