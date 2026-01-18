@@ -1282,19 +1282,19 @@ button.ghost {
   }
 
   .card-image {
-    width: 56px;
-    min-width: 56px;
-    height: 80px;
+    width: 28px;
+    min-width: 28px;
+    height: 40px;
     object-fit: cover;
   }
 
   .card-body {
-    padding: 0.35rem 0.5rem 0.4rem 0;
+    padding: 0.25rem 0.4rem 0.3rem 0;
   }
 
   .card-title {
-    font-size: 0.85rem;
-    line-height: 1.2;
+    font-size: 0.75rem;
+    line-height: 1.1;
   }
 
   .card-meta,
@@ -1388,22 +1388,37 @@ button.ghost {
     flex-shrink: 0;
   }
 
-  /* Mobile-specific search layout - full width search bar */
+  /* Mobile-specific search layout - single row with tabs, search, and trending */
   @media (max-width: 768px) {
     .list-header {
       display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    /* Hide filter input on mobile to save space - users can use search */
+    #filter-input,
+    #filter-clear {
+      display: none;
+    }
+
+    /* Create a single row layout: tabs + search + trending */
+    .tabs {
+      flex-shrink: 0;
+      order: 1;
     }
 
     .search-row {
-      width: 100%;
+      flex: 1;
+      min-width: 0;
+      order: 2;
       display: flex;
-      flex-wrap: nowrap;
+      align-items: center;
       gap: 0.5rem;
     }
 
-    /* Make search input take all available space between tabs and trending button */
     .inline-search {
       flex: 1;
       min-width: 0;
@@ -1414,10 +1429,11 @@ button.ghost {
       min-width: 0;
     }
 
-    /* Hide filter input on mobile to save space - users can use search */
-    #filter-input,
-    #filter-clear {
-      display: none;
+    /* Ensure trending button stays aligned to the right */
+    .trending-button {
+      flex-shrink: 0;
+      order: 3;
+      align-self: flex-start;
     }
   }
 
@@ -1425,11 +1441,11 @@ button.ghost {
   .mobile-search-result {
     display: none; /* Hidden by default */
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.2rem 0.3rem;
     background: var(--surface-strong);
     border: 1px solid var(--surface-border);
     border-radius: var(--radius);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.15rem;
     text-align: left;
     cursor: pointer;
     transition: transform 0.1s ease, background 0.1s ease;
@@ -1448,11 +1464,11 @@ button.ghost {
   }
 
   .mobile-search-image {
-    width: 40px;
-    height: 60px;
+    width: 10px;
+    height: 15px;
     object-fit: cover;
     border-radius: calc(var(--radius) * 0.5);
-    margin-right: 0.75rem;
+    margin-right: 0.4rem;
     flex-shrink: 0;
   }
 
@@ -1468,13 +1484,13 @@ button.ghost {
   .mobile-search-title-row {
     display: flex;
     align-items: baseline;
-    gap: 0.5rem;
+    gap: 0.4rem;
     width: 100%;
   }
 
   .mobile-search-title {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -1484,7 +1500,7 @@ button.ghost {
   }
 
   .mobile-search-year {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     color: var(--text-muted);
     flex-shrink: 0;
     margin-left: auto;
@@ -1494,27 +1510,27 @@ button.ghost {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.75rem;
-    margin-top: 0.25rem;
+    gap: 0.4rem;
+    margin-top: 0.1rem;
   }
 
   .mobile-search-imdb,
   .mobile-search-rotten {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: 0.7rem;
+    gap: 0.2rem;
+    font-size: 0.55rem;
     color: var(--text-muted);
   }
 
   .mobile-search-imdb::before {
     content: "🍿";
-    font-size: 0.8rem;
+    font-size: 0.7rem;
   }
 
   .mobile-search-rotten::before {
     content: "🍅";
-    font-size: 0.8rem;
+    font-size: 0.7rem;
   }
 
   /* Show mobile search results only on mobile */
@@ -1702,6 +1718,34 @@ button.ghost {
 
   .icon-button {
     flex-shrink: 0;
+  }
+
+  /* Ensure mobile layout works well on very small screens */
+  @media (max-width: 480px) {
+    .tabs {
+      flex-shrink: 0;
+    }
+
+    .tab {
+      padding: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    .tab-count {
+      font-size: 0.6rem;
+    }
+
+    /* Make search input more compact on small screens */
+    .input-with-clear input {
+      padding: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+    }
+
+    .input-clear {
+      width: 1rem;
+      height: 1rem;
+      font-size: 0.8rem;
+    }
   }
 
   /* Modal adjustments */

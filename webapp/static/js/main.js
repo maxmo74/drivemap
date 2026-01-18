@@ -325,11 +325,24 @@ const renderTrendingResults = (items) => {
   const limited = items.slice(0, MAX_RESULTS);
   if (!limited.length) return;
   openTrendingPopover();
-  limited.forEach((item) => {
-    const card = buildCard(item, 'search', cardTemplate, cardHandlers);
-    trendingResults.appendChild(card);
-    requestDetails(item, card);
-  });
+  const isMobileLayout = window.matchMedia('(max-width: 768px)').matches;
+  
+  if (isMobileLayout && mobileTemplate) {
+    // Use mobile compact layout for trending results
+    limited.forEach((item) => {
+      const mobileResult = buildMobileSearchResult(item, mobileTemplate, (selectedItem) => {
+        cardHandlers.onAdd(selectedItem, false);
+      });
+      trendingResults.appendChild(mobileResult);
+    });
+  } else {
+    // Use desktop layout
+    limited.forEach((item) => {
+      const card = buildCard(item, 'search', cardTemplate, cardHandlers);
+      trendingResults.appendChild(card);
+      requestDetails(item, card);
+    });
+  }
 };
 
 const renderList = (items) => {
