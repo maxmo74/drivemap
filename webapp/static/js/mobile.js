@@ -128,9 +128,7 @@ function handleSwipeGesture(startX, endX) {
 }
 
 // Export card swipe setup function for direct use
-export function setupCardSwipeGestures(onRemove, onToggle) {
-  setupCardSwipeGestures(onRemove, onToggle);
-}
+export { setupCardSwipeGestures };
 
 /**
  * Setup swipe gestures for individual cards
@@ -396,3 +394,6 @@ export function setupMobileEnhancements(loadList, options = {}) {
   setupOrientationHandler();
   setupResizeHandler();
 }
+
+// Export card swipe setup function for direct use
+export { setupCardSwipeGestures };

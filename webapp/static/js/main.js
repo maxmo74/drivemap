@@ -338,7 +338,7 @@ const renderTrendingResults = (items) => {
   } else {
     // Use desktop layout
     limited.forEach((item) => {
-      const card = buildCard(item, 'search', cardTemplate, cardHandlers);
+      const card = buildCard(item, 'list', cardTemplate, cardHandlers);
       trendingResults.appendChild(card);
       requestDetails(item, card);
     });
