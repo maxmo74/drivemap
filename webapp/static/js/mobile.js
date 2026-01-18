@@ -377,7 +377,9 @@ export function setupMobileEnhancements(loadList, options = {}) {
     window.mobileActiveTab = options.activeTab;
   }
 
-  if (isMobile() || isTouchDevice()) {
+  // Only apply mobile enhancements on actual mobile devices (small screens)
+  // Don't apply on desktop browsers that happen to support touch events
+  if (isMobile()) {
     document.body.classList.add('is-mobile');
     setupTouchFeedback();
     setupSwipeGestures();
