@@ -127,15 +127,12 @@ function handleSwipeGesture(startX, endX) {
   }
 }
 
-// Export card swipe setup function for direct use
-export { setupCardSwipeGestures };
-
 /**
  * Setup swipe gestures for individual cards
  * @param {Function} onRemove - Callback for remove action
  * @param {Function} onToggle - Callback for toggle action
  */
-function setupCardSwipeGestures(onRemove, onToggle) {
+export function setupCardSwipeGestures(onRemove, onToggle) {
   const cards = document.querySelectorAll('.card');
   let touchStartX = 0;
   let touchStartY = 0;
@@ -396,6 +393,3 @@ export function setupMobileEnhancements(loadList, options = {}) {
   setupOrientationHandler();
   setupResizeHandler();
 }
-
-// Export card swipe setup function for direct use
-export { setupCardSwipeGestures };
