@@ -29,7 +29,7 @@ import {
 } from './api.js';
 import { buildCard, buildMobileSearchResult, applyCardDetails, needsDetails } from './cards.js';
 import { attachDragHandlers, getCurrentOrder } from './drag.js';
-import { setupMobileEnhancements } from './mobile.js';
+import { attachCardLongPressHandlers, isMobile, setupMobileEnhancements } from './mobile.js';
 import { getCached, setCached, getDetailCacheKey } from './cache.js';
 
 // DOM Elements
@@ -72,6 +72,7 @@ const aboutOpenButton = document.getElementById('open-about');
 const openOptionsButton = document.getElementById('open-options');
 const optionsModal = document.getElementById('options-modal');
 const optionsModalClose = document.getElementById('options-modal-close');
+const optionsShareButton = document.getElementById('open-share');
 const optionCompact = document.getElementById('option-compact');
 const defaultRoomSelect = document.getElementById('default-room-select');
 const visitedRoomsContainer = document.getElementById('visited-rooms');
@@ -95,6 +96,11 @@ const listPagination = document.getElementById('list-pagination');
 const listPrev = document.getElementById('list-prev');
 const listNext = document.getElementById('list-next');
 const listPageStatus = document.getElementById('list-page-status');
+const cardActionModal = document.getElementById('card-action-modal');
+const cardActionClose = document.getElementById('card-action-close');
+const cardActionTitle = document.getElementById('card-action-title');
+const cardActionToggle = document.getElementById('card-action-toggle');
+const cardActionRemove = document.getElementById('card-action-remove');
 
 // State
 const PAGE_SIZE = 10;
@@ -202,6 +208,18 @@ const openShareModal = () => {
   openModal(shareModal);
 };
 const closeShareModal = () => closeModal(shareModal);
+const openCardActionModal = (item) => {
+  if (!cardActionModal || !item) return;
+  if (cardActionTitle) {
+    cardActionTitle.textContent = item.title || 'List item';
+  }
+  if (cardActionToggle) {
+    cardActionToggle.textContent = item.watched ? 'Move to watchlist' : 'Move to watched';
+  }
+  cardActionModal.dataset.titleId = item.title_id;
+  openModal(cardActionModal);
+};
+const closeCardActionModal = () => closeModal(cardActionModal);
 
 // Card handlers
 const cardHandlers = {
@@ -367,7 +385,15 @@ const renderList = (items) => {
     listResults.appendChild(card);
     requestDetails(item, card);
   });
-  attachDragHandlers(listResults, syncOrder);
+  attachDragHandlers(listResults, syncOrder, { enableCardDrag: isMobile() });
+  attachCardLongPressHandlers(listResults, (card) => {
+    const titleId = card?.dataset?.titleId;
+    if (!titleId) return;
+    const item = currentListItems.find((entry) => entry.title_id === titleId);
+    if (item) {
+      openCardActionModal(item);
+    }
+  });
 };
 
 // API calls
@@ -770,6 +796,10 @@ shareModalClose?.addEventListener('click', closeShareModal);
 shareModal?.addEventListener('click', (event) => {
   if (event.target === shareModal) closeShareModal();
 });
+cardActionClose?.addEventListener('click', closeCardActionModal);
+cardActionModal?.addEventListener('click', (event) => {
+  if (event.target === cardActionModal) closeCardActionModal();
+});
 
 refreshConfirmCancel?.addEventListener('click', closeRefreshConfirmModal);
 refreshConfirmClose?.addEventListener('click', closeRefreshConfirmModal);
@@ -791,7 +821,8 @@ privacyModal?.addEventListener('click', (event) => {
 });
 
 // Button handlers
-roomTagButton?.addEventListener('click', openOptionsModal);
+roomTagButton?.addEventListener('click', openShareModal);
+roomVisibility?.addEventListener('click', openShareModal);
 trendingButton?.addEventListener('click', () => {
   closeSearchModal();
   if (isModalOpen(trendingPopover)) {
@@ -818,7 +849,10 @@ openOptionsButton?.addEventListener('click', () => {
   openOptionsModal();
 });
 
-shareRoomButton?.addEventListener('click', openShareModal);
+optionsShareButton?.addEventListener('click', () => {
+  closeOptionsModal();
+  openShareModal();
+});
 
 // Options handlers
 optionCompact?.addEventListener('change', (event) => {
@@ -876,6 +910,24 @@ shareInstagramButton?.addEventListener('click', () => {
   const url = shareModal?.dataset.shareUrl;
   if (!url) return;
   shareModalMessage.textContent = "Instagram sharing isn't direct. Copy the link and share it in the app.";
+});
+
+cardActionToggle?.addEventListener('click', async () => {
+  const titleId = cardActionModal?.dataset?.titleId;
+  if (!titleId) return;
+  const item = currentListItems.find((entry) => entry.title_id === titleId);
+  if (!item) return;
+  closeCardActionModal();
+  await cardHandlers.onToggleWatched(item);
+});
+
+cardActionRemove?.addEventListener('click', async () => {
+  const titleId = cardActionModal?.dataset?.titleId;
+  if (!titleId) return;
+  const item = currentListItems.find((entry) => entry.title_id === titleId);
+  if (!item) return;
+  closeCardActionModal();
+  await cardHandlers.onRemove(item);
 });
 
 // Privacy handlers
@@ -950,7 +1002,8 @@ setupEscapeHandler(
     about: aboutModal,
     share: shareModal,
     privacy: privacyModal,
-    options: optionsModal
+    options: optionsModal,
+    cardActions: cardActionModal
   },
   {
     search: closeSearchModal,
@@ -959,7 +1012,8 @@ setupEscapeHandler(
     about: closeAboutModal,
     share: closeShareModal,
     privacy: closePrivacyModal,
-    options: closeOptionsModal
+    options: closeOptionsModal,
+    cardActions: closeCardActionModal
   }
 );
 

@@ -21,6 +21,67 @@ export function isTouchDevice() {
 }
 
 /**
+ * Attach long-press handlers for card actions
+ * @param {HTMLElement} container - Cards container
+ * @param {Function} onLongPress - Callback when long press fires
+ */
+export function attachCardLongPressHandlers(container, onLongPress) {
+  if (!container || !isMobile()) return;
+  const cards = container.querySelectorAll('.card');
+  const pressDelay = 500;
+  const moveThreshold = 8;
+
+  cards.forEach((card) => {
+    if (card.dataset.longPressSetup) return;
+    card.dataset.longPressSetup = 'true';
+    let pressTimer = null;
+    let startX = 0;
+    let startY = 0;
+    let pointerId = null;
+
+    const clearPress = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+      pointerId = null;
+    };
+
+    card.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse') return;
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        if (onLongPress) {
+          onLongPress(card);
+        }
+      }, pressDelay);
+    });
+
+    card.addEventListener('pointermove', (event) => {
+      if (pointerId !== event.pointerId || !pressTimer) return;
+      const deltaX = Math.abs(event.clientX - startX);
+      const deltaY = Math.abs(event.clientY - startY);
+      if (deltaX > moveThreshold || deltaY > moveThreshold) {
+        clearPress();
+      }
+    });
+
+    card.addEventListener('pointerup', (event) => {
+      if (pointerId !== event.pointerId) return;
+      clearPress();
+    });
+
+    card.addEventListener('pointercancel', (event) => {
+      if (pointerId !== event.pointerId) return;
+      clearPress();
+    });
+  });
+}
+
+/**
  * Setup mobile-specific event listeners
  */
 function setupMobileEventListeners() {
@@ -384,10 +445,6 @@ export function setupMobileEnhancements(loadList, options = {}) {
     setupPullToRefresh();
     setupMobileEventListeners();
     
-    // Setup card swipe gestures if callbacks are provided
-    if (options.onCardRemove || options.onCardToggle) {
-      setupCardSwipeGestures(options.onCardRemove, options.onCardToggle);
-    }
   }
 
   setupOrientationHandler();

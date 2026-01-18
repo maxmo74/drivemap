@@ -49,7 +49,7 @@ except ImportError:
         serialize_result,
     )
 
-APP_VERSION = "1.6.20"
+APP_VERSION = "1.6.21"
 DEFAULT_ROOM_COOKIE = "shovo_default_room"
 
 bp = Blueprint("main", __name__)
@@ -85,9 +85,9 @@ def api_search() -> Any:
     user_agent = request_user_agent()
     try:
         results = fetch_suggestions(query, user_agent)
+        return jsonify({"results": [serialize_result(result) for result in results[:MAX_RESULTS]]})
     except requests.RequestException as exc:
-        return jsonify({"error": "imdb_fetch_failed", "detail": str(exc)}), 502
-    return jsonify({"results": [serialize_result(result) for result in results[:MAX_RESULTS]]})
+        return jsonify({"error": "imdb_fetch_failed", "detail": str(exc), "results": []})
 
 
 @bp.route("/api/details")

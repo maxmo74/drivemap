@@ -232,6 +232,8 @@ export function buildCard(item, mode, template, handlers) {
 
   article.dataset.titleId = item.title_id;
   article.dataset.typeLabel = item.type_label || '';
+  article.dataset.watched = item.watched ? '1' : '0';
+  article.dataset.title = item.title || '';
 
   // Add lazy loading to images
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';

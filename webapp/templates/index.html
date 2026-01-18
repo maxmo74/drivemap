@@ -32,9 +32,6 @@
             </button>
             <span class="room-visibility" id="room-visibility">Public</span>
             <span class="room-count" id="room-count">1 list</span>
-            <button class="icon-button share-button" id="share-room" type="button" aria-label="Share room">
-              <img src="/static/share.svg" alt="" class="share-icon" />
-            </button>
           </div>
           <details class="menu">
             <summary aria-label="Open menu">
@@ -228,6 +225,13 @@
           <p class="option-hint">Pick the list that opens by default on this browser.</p>
         </div>
         <div class="option-group">
+          <button class="ghost option-share" id="open-share" type="button">
+            <img src="/static/share.svg" alt="" class="share-icon" />
+            <span>Share this list</span>
+          </button>
+          <p class="option-hint">Copy the link or share it with your friends.</p>
+        </div>
+        <div class="option-group">
           <p class="option-label">Visited lists</p>
           <div id="visited-rooms" class="visited-rooms"></div>
           <p class="option-hint">Lists are public by default. Set any list to private to generate a password.</p>
@@ -271,6 +275,21 @@
             <img src="/static/instagram.svg" alt="" class="share-icon" />
             <span>Instagram</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="card-action-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal card-action-modal">
+        <div class="modal-header modal-header--compact">
+          <button class="icon-button modal-close" id="card-action-close" type="button" aria-label="Close card actions">
+            ×
+          </button>
+        </div>
+        <p class="modal-subtitle" id="card-action-title">List item</p>
+        <div class="modal-actions card-action-actions">
+          <button id="card-action-toggle" type="button">Move to watched</button>
+          <button class="ghost" id="card-action-remove" type="button">Remove from list</button>
         </div>
       </div>
     </div>

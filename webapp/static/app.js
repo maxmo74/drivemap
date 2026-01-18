@@ -37,6 +37,7 @@ const aboutOpenButton = document.getElementById('open-about');
 const openOptionsButton = document.getElementById('open-options');
 const optionsModal = document.getElementById('options-modal');
 const optionsModalClose = document.getElementById('options-modal-close');
+const optionsShareButton = document.getElementById('open-share');
 const optionCompact = document.getElementById('option-compact');
 const defaultRoomSelect = document.getElementById('default-room-select');
 const visitedRoomsContainer = document.getElementById('visited-rooms');
@@ -60,6 +61,11 @@ const listPagination = document.getElementById('list-pagination');
 const listPrev = document.getElementById('list-prev');
 const listNext = document.getElementById('list-next');
 const listPageStatus = document.getElementById('list-page-status');
+const cardActionModal = document.getElementById('card-action-modal');
+const cardActionClose = document.getElementById('card-action-close');
+const cardActionTitle = document.getElementById('card-action-title');
+const cardActionToggle = document.getElementById('card-action-toggle');
+const cardActionRemove = document.getElementById('card-action-remove');
 
 const MAX_RESULTS = 10;
 const PAGE_SIZE = 10;
@@ -77,6 +83,7 @@ let draggingOffsetY = 0;
 let activeDragHandle = null;
 let dragPlaceholder = null;
 let dragOriginRect = null;
+let pendingDrag = null;
 const pageState = { unwatched: 1, watched: 1 };
 const totalPages = { unwatched: 1, watched: 1 };
 const pendingDetailRequests = new Set();
@@ -558,6 +565,29 @@ const closeShareModal = () => {
   shareModal.setAttribute('aria-hidden', 'true');
 };
 
+const openCardActionModal = (item) => {
+  if (!cardActionModal || !item) {
+    return;
+  }
+  if (cardActionTitle) {
+    cardActionTitle.textContent = item.title || 'List item';
+  }
+  if (cardActionToggle) {
+    cardActionToggle.textContent = item.watched ? 'Move to watchlist' : 'Move to watched';
+  }
+  cardActionModal.dataset.titleId = item.title_id;
+  cardActionModal.classList.add('is-visible');
+  cardActionModal.setAttribute('aria-hidden', 'false');
+};
+
+const closeCardActionModal = () => {
+  if (!cardActionModal) {
+    return;
+  }
+  cardActionModal.classList.remove('is-visible');
+  cardActionModal.setAttribute('aria-hidden', 'true');
+};
+
 const openPrivacyModal = () => {
   if (!privacyModal) {
     return;
@@ -635,6 +665,8 @@ const buildCard = (item, mode) => {
 
   article.dataset.titleId = item.title_id;
   article.dataset.typeLabel = item.type_label || '';
+  article.dataset.watched = item.watched ? '1' : '0';
+  article.dataset.title = item.title || '';
   image.src = item.image || 'https://via.placeholder.com/300x450?text=No+Image';
   image.alt = `${item.title} poster`;
   title.textContent = item.title;
@@ -809,6 +841,74 @@ const renderTrendingResults = (items) => {
   });
 };
 
+const attachCardLongPressHandlers = (container, onLongPress) => {
+  if (!container || !window.matchMedia('(max-width: 768px)').matches) {
+    return;
+  }
+  const cards = container.querySelectorAll('.card');
+  const pressDelay = 500;
+  const moveThreshold = 8;
+
+  cards.forEach((card) => {
+    if (card.dataset.longPressSetup) {
+      return;
+    }
+    card.dataset.longPressSetup = 'true';
+    let pressTimer = null;
+    let startX = 0;
+    let startY = 0;
+    let pointerId = null;
+
+    const clearPress = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+      pointerId = null;
+    };
+
+    card.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse') {
+        return;
+      }
+      pointerId = event.pointerId;
+      startX = event.clientX;
+      startY = event.clientY;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        if (onLongPress) {
+          onLongPress(card);
+        }
+      }, pressDelay);
+    });
+
+    card.addEventListener('pointermove', (event) => {
+      if (pointerId !== event.pointerId || !pressTimer) {
+        return;
+      }
+      const deltaX = Math.abs(event.clientX - startX);
+      const deltaY = Math.abs(event.clientY - startY);
+      if (deltaX > moveThreshold || deltaY > moveThreshold) {
+        clearPress();
+      }
+    });
+
+    card.addEventListener('pointerup', (event) => {
+      if (pointerId !== event.pointerId) {
+        return;
+      }
+      clearPress();
+    });
+
+    card.addEventListener('pointercancel', (event) => {
+      if (pointerId !== event.pointerId) {
+        return;
+      }
+      clearPress();
+    });
+  });
+};
+
 const renderList = (items) => {
   listResults.innerHTML = '';
   if (!items.length) {
@@ -830,7 +930,17 @@ const renderList = (items) => {
     listResults.appendChild(card);
     requestDetails(item, card);
   });
-  attachDragHandlers();
+  attachDragHandlers(window.matchMedia('(max-width: 768px)').matches);
+  attachCardLongPressHandlers(listResults, (card) => {
+    const titleId = card?.dataset?.titleId;
+    if (!titleId) {
+      return;
+    }
+    const item = currentListItems.find((entry) => entry.title_id === titleId);
+    if (item) {
+      openCardActionModal(item);
+    }
+  });
 };
 
 const filterCachedResults = (query) => {
@@ -1109,7 +1219,9 @@ const stopPointerDragListeners = () => {
   if (!activeDragHandle || draggingPointerId === null) {
     return;
   }
-  activeDragHandle.releasePointerCapture(draggingPointerId);
+  if (activeDragHandle.releasePointerCapture) {
+    activeDragHandle.releasePointerCapture(draggingPointerId);
+  }
   document.removeEventListener('pointermove', onPointerDragMove);
   document.removeEventListener('pointerup', onPointerDragPointerUp);
   document.removeEventListener('pointercancel', onPointerDragPointerCancel);
@@ -1132,42 +1244,115 @@ const onPointerDragPointerCancel = (event) => {
   onPointerDragEnd();
 };
 
-const attachDragHandlers = () => {
+const startDrag = (targetCard, event, dragHandle) => {
+  if (!targetCard || draggingCard) {
+    return;
+  }
+  draggingCard = targetCard;
+  draggingPointerId = event.pointerId;
+  dragOriginRect = targetCard.getBoundingClientRect();
+  draggingStartY = event.clientY;
+  draggingOffsetY = 0;
+  activeDragHandle = dragHandle;
+  listResults.classList.add('is-dragging');
+  targetCard.classList.add('dragging');
+  dragPlaceholder = document.createElement('div');
+  dragPlaceholder.className = 'card drag-placeholder';
+  dragPlaceholder.style.height = `${dragOriginRect.height}px`;
+  dragPlaceholder.style.width = `${dragOriginRect.width}px`;
+  listResults.insertBefore(dragPlaceholder, targetCard.nextSibling);
+  listResults.classList.add('is-dragging');
+  targetCard.style.position = 'fixed';
+  targetCard.style.left = `${dragOriginRect.left}px`;
+  targetCard.style.top = `${dragOriginRect.top}px`;
+  targetCard.style.width = `${dragOriginRect.width}px`;
+  if (activeDragHandle?.setPointerCapture) {
+    activeDragHandle.setPointerCapture(event.pointerId);
+  }
+  document.addEventListener('pointermove', onPointerDragMove, { passive: false });
+  document.addEventListener('pointerup', onPointerDragPointerUp);
+  document.addEventListener('pointercancel', onPointerDragPointerCancel);
+  event.preventDefault();
+};
+
+const handleDragHandlePointerDown = (event) => {
+  const targetCard = event.currentTarget.closest('.card');
+  if (!targetCard) {
+    return;
+  }
+  if (draggingCard) {
+    stopPointerDragListeners();
+  }
+  startDrag(targetCard, event, event.currentTarget);
+};
+
+const clearPendingDragListeners = () => {
+  pendingDrag = null;
+  document.removeEventListener('pointermove', onPendingPointerMove);
+  document.removeEventListener('pointerup', onPendingPointerUp);
+  document.removeEventListener('pointercancel', onPendingPointerCancel);
+};
+
+const onPendingPointerMove = (event) => {
+  if (!pendingDrag || event.pointerId !== pendingDrag.pointerId) {
+    return;
+  }
+  const deltaX = Math.abs(event.clientX - pendingDrag.startX);
+  const deltaY = Math.abs(event.clientY - pendingDrag.startY);
+  if (deltaX < 6 && deltaY < 6) {
+    return;
+  }
+  if (event.timeStamp - pendingDrag.startTime < 120) {
+    clearPendingDragListeners();
+    return;
+  }
+  const { card } = pendingDrag;
+  clearPendingDragListeners();
+  startDrag(card, event, card);
+};
+
+const onPendingPointerUp = (event) => {
+  if (!pendingDrag || event.pointerId !== pendingDrag.pointerId) {
+    return;
+  }
+  clearPendingDragListeners();
+};
+
+const onPendingPointerCancel = (event) => {
+  if (!pendingDrag || event.pointerId !== pendingDrag.pointerId) {
+    return;
+  }
+  clearPendingDragListeners();
+};
+
+const handleCardPointerDown = (event) => {
+  const targetCard = event.currentTarget.closest('.card');
+  if (!targetCard || draggingCard) {
+    return;
+  }
+  if (event.pointerType === 'mouse') {
+    return;
+  }
+  pendingDrag = {
+    card: targetCard,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    startTime: event.timeStamp
+  };
+  document.addEventListener('pointermove', onPendingPointerMove, { passive: false });
+  document.addEventListener('pointerup', onPendingPointerUp);
+  document.addEventListener('pointercancel', onPendingPointerCancel);
+};
+
+const attachDragHandlers = (enableCardDrag = false) => {
   listResults.querySelectorAll('.card').forEach((card) => {
     card.querySelectorAll('.card-drag-handle').forEach((handle) => {
-      handle.addEventListener('pointerdown', (event) => {
-        const targetCard = event.currentTarget.closest('.card');
-        if (!targetCard) {
-          return;
-        }
-        if (draggingCard) {
-          stopPointerDragListeners();
-        }
-        draggingCard = targetCard;
-        draggingPointerId = event.pointerId;
-        dragOriginRect = targetCard.getBoundingClientRect();
-        draggingStartY = event.clientY;
-        draggingOffsetY = 0;
-        activeDragHandle = event.currentTarget;
-        listResults.classList.add('is-dragging');
-        targetCard.classList.add('dragging');
-        dragPlaceholder = document.createElement('div');
-        dragPlaceholder.className = 'card drag-placeholder';
-        dragPlaceholder.style.height = `${dragOriginRect.height}px`;
-        dragPlaceholder.style.width = `${dragOriginRect.width}px`;
-        listResults.insertBefore(dragPlaceholder, targetCard.nextSibling);
-        listResults.classList.add('is-dragging');
-        targetCard.style.position = 'fixed';
-        targetCard.style.left = `${dragOriginRect.left}px`;
-        targetCard.style.top = `${dragOriginRect.top}px`;
-        targetCard.style.width = `${dragOriginRect.width}px`;
-        event.currentTarget.setPointerCapture(event.pointerId);
-        document.addEventListener('pointermove', onPointerDragMove, { passive: false });
-        document.addEventListener('pointerup', onPointerDragPointerUp);
-        document.addEventListener('pointercancel', onPointerDragPointerCancel);
-        event.preventDefault();
-      });
+      handle.addEventListener('pointerdown', handleDragHandlePointerDown);
     });
+    if (enableCardDrag) {
+      card.addEventListener('pointerdown', handleCardPointerDown);
+    }
   });
 };
 
@@ -1288,6 +1473,9 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && shareModal?.classList.contains('is-visible')) {
     closeShareModal();
   }
+  if (event.key === 'Escape' && cardActionModal?.classList.contains('is-visible')) {
+    closeCardActionModal();
+  }
   if (event.key === 'Escape' && privacyModal?.classList.contains('is-visible')) {
     closePrivacyModal();
   }
@@ -1321,7 +1509,8 @@ aboutModal?.addEventListener('click', (event) => {
     closeAboutModal();
   }
 });
-roomTagButton?.addEventListener('click', openOptionsModal);
+roomTagButton?.addEventListener('click', openShareModal);
+roomVisibility?.addEventListener('click', openShareModal);
 trendingButton?.addEventListener('click', () => {
   closeSearchModal();
   if (trendingPopover?.classList.contains('is-visible')) {
@@ -1378,14 +1567,20 @@ defaultRoomSelect?.addEventListener('change', (event) => {
   settings.defaultRoom = target.value;
   saveSettings();
 });
-
-shareRoomButton?.addEventListener('click', () => {
+optionsShareButton?.addEventListener('click', () => {
+  closeOptionsModal();
   openShareModal();
 });
 shareModalClose?.addEventListener('click', closeShareModal);
 shareModal?.addEventListener('click', (event) => {
   if (event.target === shareModal) {
     closeShareModal();
+  }
+});
+cardActionClose?.addEventListener('click', closeCardActionModal);
+cardActionModal?.addEventListener('click', (event) => {
+  if (event.target === cardActionModal) {
+    closeCardActionModal();
   }
 });
 shareCopyButton?.addEventListener('click', async () => {
@@ -1435,6 +1630,32 @@ shareInstagramButton?.addEventListener('click', () => {
   }
   handleShareAction(url);
   shareModalMessage.textContent = 'Instagram sharing isn’t direct. Copy the link and share it in the app.';
+});
+
+cardActionToggle?.addEventListener('click', async () => {
+  const titleId = cardActionModal?.dataset?.titleId;
+  if (!titleId) {
+    return;
+  }
+  const item = currentListItems.find((entry) => entry.title_id === titleId);
+  if (!item) {
+    return;
+  }
+  closeCardActionModal();
+  await toggleWatched(item);
+});
+
+cardActionRemove?.addEventListener('click', async () => {
+  const titleId = cardActionModal?.dataset?.titleId;
+  if (!titleId) {
+    return;
+  }
+  const item = currentListItems.find((entry) => entry.title_id === titleId);
+  if (!item) {
+    return;
+  }
+  closeCardActionModal();
+  await removeFromList(item);
 });
 
 privacyCancelButton?.addEventListener('click', () => {

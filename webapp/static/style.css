@@ -173,6 +173,7 @@ header h1 {
   background: rgba(34, 197, 94, 0.18);
   border: 1px solid rgba(34, 197, 94, 0.45);
   color: #bbf7d0;
+  cursor: pointer;
 }
 
 .room-visibility.is-private {
@@ -1258,6 +1259,22 @@ button.ghost {
   gap: 0.4rem;
 }
 
+.share-option .share-icon,
+.option-share .share-icon {
+  filter: brightness(1.6) saturate(1.1);
+}
+
+.option-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.card-action-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .privacy-error {
   color: #fca5a5;
   font-size: 0.8rem;
@@ -1318,6 +1335,10 @@ button.ghost {
 
   .card-row-actions {
     gap: 0.2rem;
+  }
+
+  .card-row-actions {
+    display: none;
   }
 
   /* Mobile-specific card layout reorganization */
@@ -1427,6 +1448,11 @@ button.ghost {
     #search-input {
       width: 100%;
       min-width: 0;
+    }
+
+    input[type="search"] {
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
     }
 
     /* Ensure trending button stays aligned to the right */
