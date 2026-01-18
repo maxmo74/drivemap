@@ -49,7 +49,7 @@ except ImportError:
         serialize_result,
     )
 
-APP_VERSION = "1.6.4"
+APP_VERSION = "1.6.13"
 DEFAULT_ROOM_COOKIE = "shovo_default_room"
 
 bp = Blueprint("main", __name__)

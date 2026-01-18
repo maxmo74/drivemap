@@ -57,14 +57,14 @@ main {
 header {
   display: flex;
   flex-direction: row;
-  gap: 1.5rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 header h1 {
   margin: 0;
-  font-size: 2.2rem;
+  font-size: 1.5rem;
   letter-spacing: -0.02em;
 }
 
@@ -74,50 +74,54 @@ header h1 {
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
   letter-spacing: -0.03em;
 }
 
 .logo-text {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 600;
 }
 
 .logo-play {
-  font-size: 2.1rem;
+  font-size: 1.6rem;
   color: #ffffff;
   display: inline-flex;
   align-items: center;
   margin-right: 0.15rem;
-  transform: translateY(2px);
+  transform: translateY(1px);
 }
 
 .brand-top {
   display: flex;
-  align-items: flex-end;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .app-header {
   align-items: center;
   justify-content: space-between;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .brand-row {
   display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
-  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  flex-direction: row;
+  flex: 0 0 auto;
 }
 
 .version-tag {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   padding: 0;
-  align-self: flex-end;
-  margin-bottom: 0.2rem;
+  align-self: center;
+  margin-bottom: 0;
 }
 
 .room-pill {
