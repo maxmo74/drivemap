@@ -1261,7 +1261,7 @@ button.ghost {
 
 .share-option .share-icon,
 .option-share .share-icon {
-  filter: brightness(1.6) saturate(1.1);
+  filter: brightness(0) invert(1);
 }
 
 .option-share {
@@ -1411,6 +1411,10 @@ button.ghost {
 
   /* Mobile-specific search layout - single row with tabs, search, and trending */
   @media (max-width: 768px) {
+    body.is-mobile {
+      overscroll-behavior-y: none;
+    }
+
     .list-header {
       display: flex;
       flex-direction: row;
@@ -1432,7 +1436,7 @@ button.ghost {
     }
 
     .search-row {
-      flex: 1;
+      flex: 2;
       min-width: 0;
       order: 2;
       display: flex;
