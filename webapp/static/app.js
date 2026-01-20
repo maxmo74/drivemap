@@ -90,6 +90,9 @@ const pendingDetailRequests = new Set();
 const detailCache = new Map();
 let refreshPollingTimer;
 let refreshOwner = false;
+let listPollingTimer = null;
+let listPollingInFlight = false;
+let lastListSignature = '';
 let trendingCache = null;
 let trendingPreloadPromise = null;
 const preloadedTabs = new Set();
@@ -848,7 +851,7 @@ const attachCardLongPressHandlers = (container, onLongPress) => {
     return;
   }
   const cards = container.querySelectorAll('.card');
-  const pressDelay = 1500;
+  const pressDelay = 2500;
   const moveThreshold = 8;
 
   cards.forEach((card) => {
@@ -1021,6 +1024,34 @@ const debounceSearch = () => {
   searchTimer = setTimeout(fetchSearch, 250);
 };
 
+const buildListSignature = (items, tab, page) =>
+  `${tab}:${page}:${items.map((item) => item.title_id).join('|')}`;
+
+const applyListData = (data, page) => {
+  totalPages[activeTab] = data.total_pages || 1;
+  currentListItems = data.items || [];
+  renderList(applyFilter(currentListItems));
+  lastListSignature = buildListSignature(currentListItems, activeTab, page);
+  if (activeTab === 'unwatched' && countWatchlist) {
+    countWatchlist.textContent = String(data.total_count || 0);
+  }
+  if (activeTab === 'watched' && countWatched) {
+    countWatched.textContent = String(data.total_count || 0);
+  }
+  if (listPageStatus) {
+    listPageStatus.textContent = `Page ${pageState[activeTab]} of ${totalPages[activeTab]}`;
+  }
+  if (listPrev) {
+    listPrev.disabled = pageState[activeTab] <= 1;
+  }
+  if (listNext) {
+    listNext.disabled = pageState[activeTab] >= totalPages[activeTab];
+  }
+  if (listPagination) {
+    listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
+  }
+};
+
 const loadList = async () => {
   if (isRoomPrivate(room) && !isRoomAuthorized(room)) {
     showStatus(listResults, 'This list is private. Enter the password to continue.');
@@ -1042,27 +1073,7 @@ const loadList = async () => {
     await loadList();
     return;
   }
-  totalPages[activeTab] = data.total_pages || 1;
-  currentListItems = data.items || [];
-  renderList(applyFilter(currentListItems));
-  if (activeTab === 'unwatched' && countWatchlist) {
-    countWatchlist.textContent = String(data.total_count || 0);
-  }
-  if (activeTab === 'watched' && countWatched) {
-    countWatched.textContent = String(data.total_count || 0);
-  }
-  if (listPageStatus) {
-    listPageStatus.textContent = `Page ${pageState[activeTab]} of ${totalPages[activeTab]}`;
-  }
-  if (listPrev) {
-    listPrev.disabled = pageState[activeTab] <= 1;
-  }
-  if (listNext) {
-    listNext.disabled = pageState[activeTab] >= totalPages[activeTab];
-  }
-  if (listPagination) {
-    listPagination.style.display = totalPages[activeTab] > 1 ? 'flex' : 'none';
-  }
+  applyListData(data, page);
   preloadTabImages(activeTab === 'watched' ? 'unwatched' : 'watched');
   pollRefreshStatus();
 };
@@ -1089,6 +1100,60 @@ const preloadTabImages = async (tab) => {
   } catch (error) {
     // no-op
   }
+};
+
+const pollListUpdates = async () => {
+  if (
+    document.hidden ||
+    listPollingInFlight ||
+    draggingCard ||
+    listResults?.classList.contains('is-dragging')
+  ) {
+    return;
+  }
+  if (isRoomPrivate(room) && !isRoomAuthorized(room)) {
+    return;
+  }
+  listPollingInFlight = true;
+  const page = pageState[activeTab];
+  try {
+    const response = await fetch(
+      `/api/list?room=${encodeURIComponent(room)}&status=${activeTab}&page=${page}&per_page=${PAGE_SIZE}`
+    );
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    if (!data.items?.length && page > 1) {
+      pageState[activeTab] = page - 1;
+      await loadList();
+      return;
+    }
+    const nextSignature = buildListSignature(data.items || [], activeTab, page);
+    if (nextSignature === lastListSignature) {
+      return;
+    }
+    applyListData(data, page);
+  } catch (error) {
+    // no-op
+  } finally {
+    listPollingInFlight = false;
+  }
+};
+
+const startListPolling = () => {
+  if (listPollingTimer) {
+    return;
+  }
+  listPollingTimer = setInterval(pollListUpdates, 8000);
+};
+
+const stopListPolling = () => {
+  if (!listPollingTimer) {
+    return;
+  }
+  clearInterval(listPollingTimer);
+  listPollingTimer = null;
 };
 
 const fetchTrending = async () => {
@@ -1300,6 +1365,7 @@ const startDrag = (targetCard, event, dragHandle) => {
   dragPlaceholder.style.width = `${dragOriginRect.width}px`;
   listResults.insertBefore(dragPlaceholder, targetCard);
   listResults.classList.add('is-dragging');
+  document.body.appendChild(targetCard);
   targetCard.style.position = 'fixed';
   targetCard.style.left = `${dragOriginRect.left}px`;
   targetCard.style.top = `${dragOriginRect.top}px`;
@@ -1534,6 +1600,14 @@ document.addEventListener('click', (event) => {
   }
   closeSearchModal();
   closeTrendingPopover();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopListPolling();
+    return;
+  }
+  startListPolling();
+  pollListUpdates();
 });
 imageModalClose?.addEventListener('click', closeImageModal);
 imageModal?.addEventListener('click', (event) => {
@@ -1797,6 +1871,7 @@ updateRoomLabel();
 loadList();
 renderSearchResults([]);
 preloadTrending();
+startListPolling();
 
 // Mobile-specific enhancements
 function setupMobileEnhancements() {
