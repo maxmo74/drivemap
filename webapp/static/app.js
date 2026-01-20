@@ -90,6 +90,8 @@ const pendingDetailRequests = new Set();
 const detailCache = new Map();
 let refreshPollingTimer;
 let refreshOwner = false;
+let trendingCache = null;
+let trendingPreloadPromise = null;
 const preloadedTabs = new Set();
 let currentListItems = [];
 let settings = {
@@ -846,7 +848,7 @@ const attachCardLongPressHandlers = (container, onLongPress) => {
     return;
   }
   const cards = container.querySelectorAll('.card');
-  const pressDelay = 500;
+  const pressDelay = 1500;
   const moveThreshold = 8;
 
   cards.forEach((card) => {
@@ -1094,6 +1096,22 @@ const fetchTrending = async () => {
     return;
   }
   openTrendingPopover();
+  if (trendingCache?.length) {
+    renderTrendingResults(trendingCache);
+    return;
+  }
+  if (trendingPreloadPromise) {
+    showStatus(trendingResults, 'Loading trending titles...');
+    try {
+      await trendingPreloadPromise;
+      if (trendingCache?.length) {
+        renderTrendingResults(trendingCache);
+        return;
+      }
+    } catch (error) {
+      // fall through to on-demand fetch
+    }
+  }
   showStatus(trendingResults, 'Loading trending titles...');
   try {
     const response = await fetch('/api/trending');
@@ -1106,10 +1124,30 @@ const fetchTrending = async () => {
       showStatus(trendingResults, 'No trending titles found.');
       return;
     }
+    trendingCache = data.results;
     renderTrendingResults(data.results);
   } catch (error) {
     showStatus(trendingResults, 'Unable to load trending titles.');
   }
+};
+
+const preloadTrending = async () => {
+  if (trendingCache || trendingPreloadPromise) {
+    return;
+  }
+  trendingPreloadPromise = fetch('/api/trending')
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data) => {
+      if (data?.results?.length) {
+        trendingCache = data.results;
+      }
+    })
+    .catch(() => {
+      // no-op
+    })
+    .finally(() => {
+      trendingPreloadPromise = null;
+    });
 };
 
 const addToList = async (item, watched, cardNode) => {
@@ -1260,7 +1298,7 @@ const startDrag = (targetCard, event, dragHandle) => {
   dragPlaceholder.className = 'card drag-placeholder';
   dragPlaceholder.style.height = `${dragOriginRect.height}px`;
   dragPlaceholder.style.width = `${dragOriginRect.width}px`;
-  listResults.insertBefore(dragPlaceholder, targetCard.nextSibling);
+  listResults.insertBefore(dragPlaceholder, targetCard);
   listResults.classList.add('is-dragging');
   targetCard.style.position = 'fixed';
   targetCard.style.left = `${dragOriginRect.left}px`;
@@ -1758,6 +1796,7 @@ applyShareToken();
 updateRoomLabel();
 loadList();
 renderSearchResults([]);
+preloadTrending();
 
 // Mobile-specific enhancements
 function setupMobileEnhancements() {
@@ -1834,34 +1873,6 @@ function setupMobileEnhancements() {
       if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
       }
-    });
-
-    // Add pull-to-refresh functionality
-    let startY = 0;
-    let isPulling = false;
-
-    document.addEventListener('touchstart', (e) => {
-      if (window.scrollY === 0) {
-        startY = e.touches[0].clientY;
-        isPulling = true;
-      }
-    }, { passive: true });
-
-    document.addEventListener('touchmove', (e) => {
-      if (!isPulling) return;
-      
-      const currentY = e.touches[0].clientY;
-      const diff = currentY - startY;
-      
-      if (diff > 50) {
-        // Could trigger a refresh
-        console.log('Pull to refresh triggered');
-        isPulling = false;
-      }
-    }, { passive: true });
-
-    document.addEventListener('touchend', () => {
-      isPulling = false;
     });
 
     // Add mobile-specific event listeners
